@@ -1,0 +1,807 @@
+{
+  "id": "TikTokAuthFlow01",
+  "name": "TikTok · Autenticação (OAuth + token)",
+  "nodes": [
+    {
+      "id": "038baff0-cbb2-5571-b9ee-71d84435e0f8",
+      "name": "GET /tiktok/login",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "tiktok/login",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "59788dbb-3592-54fc-a3fa-228184623a62"
+    },
+    {
+      "id": "4d9c0b4c-d4ec-53fa-9586-a8578af155f9",
+      "name": "GET /tiktok/callback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "tiktok/callback",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "00a30dd5-08f3-5f64-9509-5f6b46a608f7"
+    },
+    {
+      "id": "bbf86d4c-7560-586f-bd68-46594598141e",
+      "name": "Chamado pelo post (token)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "ca7637ee-fca1-57ab-88d5-c031e2d78edc",
+      "name": "Config (login)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15428b61-a44a-55a1-acfe-ae93499d8b4c",
+              "name": "client_key",
+              "value": "PREENCHER_CLIENT_KEY",
+              "type": "string"
+            },
+            {
+              "id": "c7acf4fb-3e83-5eae-b63f-c7469a952620",
+              "name": "client_secret",
+              "value": "PREENCHER_CLIENT_SECRET",
+              "type": "string"
+            },
+            {
+              "id": "43dbece7-a79b-5fcf-9a60-482c104315ad",
+              "name": "redirect_uri",
+              "value": "https://SEU-TUNEL.trycloudflare.com/webhook/tiktok/callback",
+              "type": "string"
+            },
+            {
+              "id": "e096aaaf-673b-5c2b-8c27-a8533faf9dbf",
+              "name": "scopes",
+              "value": "user.info.basic,video.publish",
+              "type": "string"
+            },
+            {
+              "id": "a90f9d7b-2045-51c9-aeb6-e66d99fa9c56",
+              "name": "api_base",
+              "value": "http://127.0.0.1:8765/mock-tiktok",
+              "type": "string"
+            },
+            {
+              "id": "68cf4486-5cb3-551a-b9c3-9f6b976b81fd",
+              "name": "media_api",
+              "value": "http://127.0.0.1:8765",
+              "type": "string"
+            },
+            {
+              "id": "7c1328a8-ed48-5730-801a-75ec9002f45d",
+              "name": "state",
+              "value": "case-gogroup-csrf",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "notes": "api_base: simulador local ou https://open.tiktokapis.com (API real). Credenciais do app do TikTok for Developers (sandbox)."
+    },
+    {
+      "id": "a71aa286-73b2-56a6-a663-26534c3303b0",
+      "name": "Config (callback)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15428b61-a44a-55a1-acfe-ae93499d8b4c",
+              "name": "client_key",
+              "value": "PREENCHER_CLIENT_KEY",
+              "type": "string"
+            },
+            {
+              "id": "c7acf4fb-3e83-5eae-b63f-c7469a952620",
+              "name": "client_secret",
+              "value": "PREENCHER_CLIENT_SECRET",
+              "type": "string"
+            },
+            {
+              "id": "43dbece7-a79b-5fcf-9a60-482c104315ad",
+              "name": "redirect_uri",
+              "value": "https://SEU-TUNEL.trycloudflare.com/webhook/tiktok/callback",
+              "type": "string"
+            },
+            {
+              "id": "e096aaaf-673b-5c2b-8c27-a8533faf9dbf",
+              "name": "scopes",
+              "value": "user.info.basic,video.publish",
+              "type": "string"
+            },
+            {
+              "id": "a90f9d7b-2045-51c9-aeb6-e66d99fa9c56",
+              "name": "api_base",
+              "value": "http://127.0.0.1:8765/mock-tiktok",
+              "type": "string"
+            },
+            {
+              "id": "68cf4486-5cb3-551a-b9c3-9f6b976b81fd",
+              "name": "media_api",
+              "value": "http://127.0.0.1:8765",
+              "type": "string"
+            },
+            {
+              "id": "7c1328a8-ed48-5730-801a-75ec9002f45d",
+              "name": "state",
+              "value": "case-gogroup-csrf",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "notes": "api_base: simulador local ou https://open.tiktokapis.com (API real). Credenciais do app do TikTok for Developers (sandbox)."
+    },
+    {
+      "id": "255ee44b-1fb7-5866-9d85-357d65bb4c32",
+      "name": "Config (token)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        600
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15428b61-a44a-55a1-acfe-ae93499d8b4c",
+              "name": "client_key",
+              "value": "PREENCHER_CLIENT_KEY",
+              "type": "string"
+            },
+            {
+              "id": "c7acf4fb-3e83-5eae-b63f-c7469a952620",
+              "name": "client_secret",
+              "value": "PREENCHER_CLIENT_SECRET",
+              "type": "string"
+            },
+            {
+              "id": "43dbece7-a79b-5fcf-9a60-482c104315ad",
+              "name": "redirect_uri",
+              "value": "https://SEU-TUNEL.trycloudflare.com/webhook/tiktok/callback",
+              "type": "string"
+            },
+            {
+              "id": "e096aaaf-673b-5c2b-8c27-a8533faf9dbf",
+              "name": "scopes",
+              "value": "user.info.basic,video.publish",
+              "type": "string"
+            },
+            {
+              "id": "a90f9d7b-2045-51c9-aeb6-e66d99fa9c56",
+              "name": "api_base",
+              "value": "http://127.0.0.1:8765/mock-tiktok",
+              "type": "string"
+            },
+            {
+              "id": "68cf4486-5cb3-551a-b9c3-9f6b976b81fd",
+              "name": "media_api",
+              "value": "http://127.0.0.1:8765",
+              "type": "string"
+            },
+            {
+              "id": "7c1328a8-ed48-5730-801a-75ec9002f45d",
+              "name": "state",
+              "value": "case-gogroup-csrf",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "notes": "api_base: simulador local ou https://open.tiktokapis.com (API real). Credenciais do app do TikTok for Developers (sandbox)."
+    },
+    {
+      "id": "1c8fe6bb-033d-5e10-883b-7900af2b6ffc",
+      "name": "Redirecionar para TikTok",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "respondWith": "redirect",
+        "redirectURL": "=https://www.tiktok.com/v2/auth/authorize/?client_key={{ $json.client_key }}&scope={{ encodeURIComponent($json.scopes) }}&response_type=code&redirect_uri={{ encodeURIComponent($json.redirect_uri) }}&state={{ $json.state }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "cd4723c1-e3ca-5e6f-8d86-ecb015bb1f2f",
+      "name": "State e code ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5e5c2915-761e-5ebd-8b02-47b8e95d1c99",
+              "leftValue": "={{ $json.query.state }}",
+              "rightValue": "={{ $json.state }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "6fc65b7c-1452-54a0-9f02-3d000e07d9b4",
+              "leftValue": "={{ $json.query.code }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3452bd2f-1fa5-5c28-a5c0-9b2639d1f965",
+      "name": "Trocar code por token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_base }}/v2/oauth/token/",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_key",
+              "value": "={{ $json.client_key }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "={{ $json.client_secret }}"
+            },
+            {
+              "name": "code",
+              "value": "={{ $json.query.code }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "authorization_code"
+            },
+            {
+              "name": "redirect_uri",
+              "value": "={{ $json.redirect_uri }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "68a0e3ae-d052-5173-9592-c8a8a55387b1",
+      "name": "Guardar tokens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config (callback)').first().json.media_api }}/tokens",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json, api_base: $('Config (callback)').first().json.api_base }) }}"
+      }
+    },
+    {
+      "id": "c4e3defa-ccd2-52cb-8396-1c74a7b699d2",
+      "name": "Conta conectada",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        240
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html><body style='font-family:sans-serif;text-align:center;padding:60px'><h1>✅ Conta TikTok conectada</h1><p>Pode fechar esta aba e rodar o workflow de post.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ddc7878f-fdde-56c2-b7b5-8aec302eccdd",
+      "name": "Callback inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        400
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Callback inválido (state/code ausente ou incorreto).",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "e739d47f-2f4b-5c3d-ad5c-c912694677e4",
+      "name": "Ler tokens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        600
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.media_api }}/tokens",
+        "options": {}
+      }
+    },
+    {
+      "id": "bc7cc82a-d7ea-5cd5-a676-7c2dcb0d1a26",
+      "name": "Conta conectada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e7acb47a-95b9-5a1e-8a9e-37a96c0b2eb7",
+              "leftValue": "={{ $json.refresh_token || $json.access_token || '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8233cdbe-f873-56d3-b3dc-f533272e443a",
+      "name": "Conta não conectada",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        960,
+        760
+      ],
+      "parameters": {
+        "errorMessage": "Conta TikTok não conectada: abra <N8N_WEBHOOK_URL>/webhook/tiktok/login e autorize."
+      }
+    },
+    {
+      "id": "bd5a6435-a2b5-585a-9395-7ed5757c6e4f",
+      "name": "Token ainda vale?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cb4d4dcb-618a-598b-8523-86046527bc38",
+              "leftValue": "={{ ($json.expira_em || 0) - Math.floor(Date.now() / 1000) > 300 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f249d6f1-3a63-510e-a0e8-c3e986ed54dc",
+      "name": "Renovar token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        700
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_base }}/v2/oauth/token/",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_key",
+              "value": "={{ $('Config (token)').first().json.client_key }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "={{ $('Config (token)').first().json.client_secret }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "33f3207f-1da7-505c-90ce-7630b51009a1",
+      "name": "Guardar token renovado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        700
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config (token)').first().json.media_api }}/tokens",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json, api_base: $('Ler tokens').first().json.api_base }) }}"
+      }
+    },
+    {
+      "id": "6bf4d230-fbb8-5164-9086-ba40bf8e4fcb",
+      "name": "Token renovado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        700
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "caa61c18-1b50-5ab0-b9dc-c51f53f6c8e6",
+              "name": "access_token",
+              "value": "={{ $('Renovar token').first().json.access_token }}",
+              "type": "string"
+            },
+            {
+              "id": "f8fa8623-9ace-5ba4-b453-7415f60b44d2",
+              "name": "api_base",
+              "value": "={{ $('Ler tokens').first().json.api_base }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    },
+    {
+      "id": "e77e40ce-c0c3-55f2-9996-e6fa93212b4b",
+      "name": "Token atual",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        540
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f0b7b313-d6a9-5b32-9ef8-a9a8b6340a47",
+              "name": "access_token",
+              "value": "={{ $json.access_token }}",
+              "type": "string"
+            },
+            {
+              "id": "4fbce114-f609-5125-97db-a65f2af84584",
+              "name": "api_base",
+              "value": "={{ $json.api_base }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "GET /tiktok/login": {
+      "main": [
+        [
+          {
+            "node": "Config (login)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /tiktok/callback": {
+      "main": [
+        [
+          {
+            "node": "Config (callback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamado pelo post (token)": {
+      "main": [
+        [
+          {
+            "node": "Config (token)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (login)": {
+      "main": [
+        [
+          {
+            "node": "Redirecionar para TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (callback)": {
+      "main": [
+        [
+          {
+            "node": "State e code ok?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State e code ok?": {
+      "main": [
+        [
+          {
+            "node": "Trocar code por token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Callback inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trocar code por token": {
+      "main": [
+        [
+          {
+            "node": "Guardar tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar tokens": {
+      "main": [
+        [
+          {
+            "node": "Conta conectada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (token)": {
+      "main": [
+        [
+          {
+            "node": "Ler tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler tokens": {
+      "main": [
+        [
+          {
+            "node": "Conta conectada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conta conectada?": {
+      "main": [
+        [
+          {
+            "node": "Token ainda vale?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Conta não conectada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token ainda vale?": {
+      "main": [
+        [
+          {
+            "node": "Token atual",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Renovar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renovar token": {
+      "main": [
+        [
+          {
+            "node": "Guardar token renovado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar token renovado": {
+      "main": [
+        [
+          {
+            "node": "Token renovado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

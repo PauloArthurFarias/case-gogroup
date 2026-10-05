@@ -1,0 +1,5 @@
+data,tema,titulo,publish_id,status,privacidade,video,modo,erro
+2026-10-05T16:38:33,golpe do boleto,Esse boleto parece certo. Mas é golpe.,v_pub_mock_43b16659ffe3,PUBLISH_COMPLETE,SELF_ONLY,http://127.0.0.1:8765/videos/20261005-163809-5cae46/video.mp4,simulador,
+2026-10-05T16:39:07,n8n,Automatizei meu TikTok com n8n. Sem programar.,v_pub_mock_2d99d998edcf,PUBLISH_COMPLETE,SELF_ONLY,http://127.0.0.1:8765/videos/20261005-163845-68282f/video.mp4,simulador,
+2026-10-05T16:39:34,,,,ERRO,,http://localhost:5678/workflow/TikTokPostMain01/executions/12,TikTok · Post automático com IA,Token TikTok válido: Conta TikTok não conectada: abra <WEBHOOK_URL>/webhook/tiktok/login e autorize.
+2026-10-05T16:40:19,chão de fábrica,Sua fábrica perde dinheiro em paradas que ninguém registra.,v_pub_mock_1bb6e72642e1,PUBLISH_COMPLETE,SELF_ONLY,http://127.0.0.1:8765/videos/20261005-163958-5a4058/video.mp4,simulador,

@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+desafio1-agente-nf/inbox/*
+desafio1-agente-nf/data/*.db
+desafio1-agente-nf/data/export/
+desafio2-tiktok-n8n/output/
+desafio2-tiktok-n8n/tokens.json
+!.gitkeep

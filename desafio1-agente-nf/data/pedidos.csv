@@ -1,0 +1,10 @@
+pedido,cnpj_fornecedor,codigo,descricao,quantidade,valor_unitario
+PC-1001,45987123000104,ACO-1020,Chapa de aço 1020 3mm,50,412.0
+PC-1002,30111222000142,CX-40,Caixa papelão 40x30,2000,3.15
+PC-1002,30111222000142,FIT-48,Fita adesiva 48mm,300,6.9
+PC-1003,27555666000162,OL-68,Óleo hidráulico ISO 68 (balde 20L),12,389.0
+PC-1004,19444888000180,LUV-NIT,Luva nitrílica (par),500,4.2
+PC-1004,19444888000180,OCL-01,Óculos de proteção,100,18.5
+PC-1005,08333777000180,FRT-SP,Frete rodoviário SP-Campinas,1,2850.0
+PC-1006,45987123000104,ACO-1045,Barra redonda aço 1045 2pol,30,265.0
+PC-1007,30111222000142,PAL-PBR,Palete PBR,80,58.0

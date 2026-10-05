@@ -1,0 +1,108 @@
+{
+  "id": "TikTokMcpServer1",
+  "name": "TikTok · Servidor MCP",
+  "nodes": [
+    {
+      "id": "6755e845-5435-5270-9623-2ef73b4a3648",
+      "name": "MCP Server Trigger",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "tiktok"
+      },
+      "webhookId": "00e58c9a-8be3-517b-b3ba-1d958d564228",
+      "notes": "Endpoint MCP: <n8n>/mcp/tiktok. Conecte no Claude Code/Desktop."
+    },
+    {
+      "id": "fa69dfe8-5f8c-5096-afb5-9adcb46c580b",
+      "name": "criar_post_tiktok",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -200,
+        240
+      ],
+      "parameters": {
+        "description": "Cria e publica um vídeo curto no TikTok sobre o tema informado: gera roteiro, narração e vídeo 9:16 e publica pela Content Posting API. Retorna status, publish_id e legenda. Pode levar cerca de 1 minuto.",
+        "workflowId": {
+          "__rl": true,
+          "value": "TikTokPostMain01",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tema": "={{ $fromAI('tema', 'Tema do vídeo, ex.: golpe do boleto. Vazio = automático', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tema",
+              "displayName": "tema",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
+    },
+    {
+      "id": "3564332f-5cca-556d-a85f-ddcb5ab97af1",
+      "name": "historico_publicacoes",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        240
+      ],
+      "parameters": {
+        "toolDescription": "Lista as publicações já feitas (data, tema, status, publish_id, modo).",
+        "url": "http://127.0.0.1:8765/log",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "criar_post_tiktok": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "historico_publicacoes": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

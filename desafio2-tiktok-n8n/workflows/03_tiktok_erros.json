@@ -1,0 +1,58 @@
+{
+  "id": "TikTokErrors0001",
+  "name": "TikTok · Tratamento de erros",
+  "nodes": [
+    {
+      "id": "2369fe43-dda8-534c-83a6-611190471da8",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "bfac133d-b311-54e8-8d25-6e017618ed6d",
+      "name": "Registrar erro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8765/log",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'ERRO', modo: $json.workflow.name, erro: ($json.execution.lastNodeExecuted || '') + ': ' + ($json.execution.error?.message || 'desconhecido'), video: $json.execution.url || '' }) }}"
+      },
+      "notes": "Também é o ponto para plugar alerta (Telegram/Slack/e-mail)."
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Registrar erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

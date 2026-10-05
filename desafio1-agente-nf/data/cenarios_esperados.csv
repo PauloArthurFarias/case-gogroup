@@ -1,0 +1,12 @@
+arquivo,cenario,status_esperado
+nfe_001_aco_ok.xml,"NF-e correta, bate com pedido e recebimento",APROVADO
+nfe_002_embalagens_ok.xml,NF-e correta com 2 itens,APROVADO
+boleto_002_embalagens.pdf,"Boleto da NF 002, beneficiário e valor conferem",APROVADO
+nfe_003_lubrificante_preco_acima.xml,Preço unitário 8% acima do pedido,REVISAO
+nfe_004_epi_qtd_maior_que_recebida.xml,"Cobrou 500 luvas, almoxarifado recebeu 400",REVISAO
+nfe_005_fornecedor_desconhecido.xml,CNPJ emitente fora do cadastro de fornecedores,REJEITADO
+nfe_006_duplicada_do_001.xml,Mesma chave de acesso da NF 001 (pagamento em duplicidade),REJEITADO
+nfe_007_chave_invalida.xml,Chave de acesso com dígito verificador adulterado,REJEITADO
+danfe_008_frete_somente_pdf.pdf,Fornecedor só envia DANFE em PDF (extração por IA; no modo offline vai para REVISAO),APROVADO
+boleto_009_fraude_beneficiario.pdf,Boleto da NF 010 com CNPJ do beneficiário trocado (golpe do boleto),REJEITADO
+nfe_010_paletes_vence_em_2_dias.xml,NF-e correta mas com vencimento em 2 dias (prioridade),APROVADO

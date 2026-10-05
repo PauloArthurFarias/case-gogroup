@@ -1,0 +1,1181 @@
+{
+  "id": "TikTokPostMain01",
+  "name": "TikTok · Post automático com IA",
+  "nodes": [
+    {
+      "id": "a7f00499-155f-52c9-9528-d86778818ee6",
+      "name": "Testar agora",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "dfa7efd4-0949-531c-b65e-86a094a5aff7",
+      "name": "Agendado (diário 11h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 11
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a762035d-ae8e-5059-86bf-30ae00c6a301",
+      "name": "Formulário (tema manual)",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        320
+      ],
+      "parameters": {
+        "formTitle": "Novo post no TikTok",
+        "formDescription": "Gera roteiro, vídeo e publica. Deixe vazio para tema automático.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "tema",
+              "placeholder": "ex.: golpe do boleto"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "webhookId": "202f51f9-1fde-56f5-b842-7e16c8e8250f"
+    },
+    {
+      "id": "090f1e51-e20b-5d25-ac9b-4bd74f472091",
+      "name": "Chamado via MCP / outro workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        480
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tema"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "682d2c44-f571-5bc0-9005-c3384cedb2d3",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        240
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e876872c-c04f-5aca-be0d-cbcf18c2cdd0",
+              "name": "tema",
+              "value": "={{ ($json.tema || '').toString().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "427855fe-ccd2-549b-9cf2-3fab4a52077f",
+              "name": "usar_ia",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "078edf01-7df6-5e1f-b4a2-5999cfbc7cc1",
+              "name": "modelo",
+              "value": "claude-opus-5-5",
+              "type": "string"
+            },
+            {
+              "id": "68cf4486-5cb3-551a-b9c3-9f6b976b81fd",
+              "name": "media_api",
+              "value": "http://127.0.0.1:8765",
+              "type": "string"
+            },
+            {
+              "id": "033e7a5b-3f88-5090-8542-abfdf9a6d04e",
+              "name": "privacidade_preferida",
+              "value": "SELF_ONLY",
+              "type": "string"
+            },
+            {
+              "id": "3af7fa32-5b02-5d4f-a993-2c892cf56853",
+              "name": "exigir_aprovacao",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "5c35876f-348b-508b-a510-dce2b5821027",
+              "name": "telegram_chat_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "8a3a134f-4e32-5aa1-8515-80cad52c3dd6",
+              "name": "marca",
+              "value": "@automacao.na.pratica",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Painel de controle: ligue usar_ia quando houver credencial Anthropic; exigir_aprovacao liga a revisão via Telegram."
+    },
+    {
+      "id": "eac2f3cb-44b0-5c04-9f93-a14be40bb75d",
+      "name": "Usar IA?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2d28257c-68b8-52ce-87cf-b30db6917432",
+              "leftValue": "={{ $json.usar_ia }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f171f555-c7d4-5c6b-bc05-488469b7cae6",
+      "name": "Claude: gerar roteiro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "options": {
+          "timeout": 120000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "server-side-fallback-2026-07-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: $json.modelo,\n  max_tokens: 4000,\n  fallbacks: 'default',\n  output_config: { effort: 'low', format: { type: 'json_schema', schema: {\"type\": \"object\", \"additionalProperties\": false, \"required\": [\"tema\", \"gancho\", \"cenas\", \"cta\", \"hashtags\"], \"properties\": {\"tema\": {\"type\": \"string\"}, \"gancho\": {\"type\": \"string\", \"description\": \"Frase de até 12 palavras para prender nos 2 primeiros segundos\"}, \"cenas\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"additionalProperties\": false, \"required\": [\"texto\", \"narracao\"], \"properties\": {\"texto\": {\"type\": \"string\", \"description\": \"Texto na tela, até 8 palavras\"}, \"narracao\": {\"type\": \"string\", \"description\": \"Fala da cena, 1 a 2 frases\"}}}}, \"cta\": {\"type\": \"string\"}, \"hashtags\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}}} } },\n  system: \"Você é roteirista de vídeos curtos (TikTok, 20 a 40 segundos) de um perfil brasileiro sobre automação, IA e produtividade para empresas (financeiro, indústria, supply, RPA, n8n).\\n\\nEscreva em português do Brasil, tom direto e próximo, sem jargão desnecessário.\\n\\nEstrutura obrigatória:\\n- gancho: até 12 palavras, provocativo, que prenda nos 2 primeiros segundos (pergunta, dado surpreendente ou erro comum).\\n- cenas: 3 ou 4 cenas. Em cada uma, `texto` é o que aparece na tela (até 8 palavras) e `narracao` é a fala (1 a 2 frases curtas, até 25 palavras).\\n- cta: chamada final curta (seguir, comentar uma palavra, salvar).\\n- hashtags: 4 a 6, minúsculas, relevantes em português.\\n\\nRegras:\\n- Uma ideia prática e verdadeira por vídeo. Nada de promessas exageradas (\\\"fique rico\\\", \\\"100% garantido\\\").\\n- Não cite marcas, empresas ou pessoas reais.\\n- Duração total da narração: até 40 segundos (cerca de 100 palavras).\\n\",\n  messages: [{ role: 'user', content: 'Tema: ' + ($json.tema || 'escolha um tema útil de automação para empresas') }]\n}) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "notes": "Structured output: a resposta é JSON garantido pelo schema. Falhou? cai no banco de roteiros."
+    },
+    {
+      "id": "ef28eccb-7943-5e9b-9312-9d180db31ff1",
+      "name": "Ler resposta da IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nif (r.stop_reason === 'refusal') throw new Error('Claude recusou: ' + JSON.stringify(r.stop_details));\nif (r.stop_reason === 'max_tokens') throw new Error('Resposta truncada (max_tokens)');\nconst texto = (r.content || []).find(b => b.type === 'text')?.text;\nif (!texto) throw new Error('Resposta sem bloco de texto');\nreturn [{ json: { ...JSON.parse(texto), origem: 'ia:' + r.model,\n  tokens: (r.usage?.input_tokens || 0) + (r.usage?.output_tokens || 0) } }];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "78922121-d87c-5913-b38b-a72f37100057",
+      "name": "Banco de roteiros",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        340
+      ],
+      "parameters": {
+        "jsCode": "// Banco de roteiros: usado quando a IA está desligada (sem chave) ou falha.\n// Escolhe pelo tema informado (busca por palavra) ou faz rodízio pelo dia do ano.\nconst banco = [\n  {\n    tema: \"nota fiscal\",\n    gancho: \"Seu time ainda digita nota fiscal à mão?\",\n    cenas: [\n      { texto: \"O XML da NF-e já traz tudo pronto\", narracao: \"O XML da nota fiscal eletrônica já traz todos os dados prontos. Digitar é desperdício.\" },\n      { texto: \"Um robô confere com o pedido de compra\", narracao: \"Um robô lê o XML e confere item a item com o pedido de compra e com o que chegou no almoxarifado.\" },\n      { texto: \"Só as exceções chegam para você\", narracao: \"Você só olha as exceções: preço diferente, quantidade a mais ou nota duplicada.\" },\n    ],\n    cta: \"Quer o passo a passo? Siga para a parte 2!\",\n    hashtags: [\"#automacao\", \"#rpa\", \"#financeiro\", \"#notafiscal\", \"#produtividade\"],\n  },\n  {\n    tema: \"golpe do boleto\",\n    gancho: \"Esse boleto parece certo. Mas é golpe.\",\n    cenas: [\n      { texto: \"Nome do fornecedor certo, CNPJ errado\", narracao: \"No golpe do boleto, o nome do fornecedor está certo, mas o CNPJ do beneficiário é de outra pessoa.\" },\n      { texto: \"A automação compara com o cadastro\", narracao: \"Uma automação simples compara o beneficiário com o cadastro de fornecedores antes de pagar.\" },\n      { texto: \"E valida os dígitos da linha digitável\", narracao: \"E ainda valida os dígitos verificadores da linha digitável e o valor do código de barras.\" },\n    ],\n    cta: \"Salve este vídeo e mostre para o seu financeiro!\",\n    hashtags: [\"#golpedoboleto\", \"#seguranca\", \"#financeiro\", \"#automacao\", \"#dica\"],\n  },\n  {\n    tema: \"n8n\",\n    gancho: \"Automatizei meu TikTok com n8n. Sem programar.\",\n    cenas: [\n      { texto: \"A IA escreve o roteiro\", narracao: \"Primeiro, uma IA escreve o roteiro com gancho, cenas e chamada para ação.\" },\n      { texto: \"O vídeo é montado sozinho\", narracao: \"Depois o vídeo é montado sozinho: narração, legendas e formato vertical.\" },\n      { texto: \"E publicado pela API oficial\", narracao: \"Por fim, o n8n publica pela API oficial do TikTok e registra tudo numa planilha.\" },\n    ],\n    cta: \"Comenta 'n8n' que eu te mando o fluxo!\",\n    hashtags: [\"#n8n\", \"#automacao\", \"#nocode\", \"#ia\", \"#tiktokdicas\"],\n  },\n  {\n    tema: \"chão de fábrica\",\n    gancho: \"Sua fábrica perde dinheiro em paradas que ninguém registra.\",\n    cenas: [\n      { texto: \"Operador manda áudio no WhatsApp\", narracao: \"O operador só manda um áudio no WhatsApp dizendo o que parou e por quê.\" },\n      { texto: \"A IA classifica a causa\", narracao: \"A inteligência artificial transcreve, classifica a causa e calcula o tempo parado.\" },\n      { texto: \"O gestor recebe o relatório do turno\", narracao: \"No fim do turno, o gestor recebe o relatório pronto, com as maiores perdas.\" },\n    ],\n    cta: \"Siga para ver mais automações industriais!\",\n    hashtags: [\"#industria\", \"#manufatura\", \"#automacao\", \"#ia\", \"#oee\"],\n  },\n  {\n    tema: \"planilha\",\n    gancho: \"3 tarefas de planilha que um robô faz por você.\",\n    cenas: [\n      { texto: \"1. Juntar relatórios de vários e-mails\", narracao: \"Um: juntar relatórios que chegam em vários e-mails numa planilha só.\" },\n      { texto: \"2. Conciliar extrato com contas a pagar\", narracao: \"Dois: conciliar o extrato do banco com o contas a pagar.\" },\n      { texto: \"3. Mandar alerta de vencimento\", narracao: \"Três: mandar alerta antes de cada vencimento, para nunca mais pagar juros.\" },\n    ],\n    cta: \"Qual dessas você quer aprender? Comenta!\",\n    hashtags: [\"#excel\", \"#planilha\", \"#automacao\", \"#rpa\", \"#produtividade\"],\n  },\n];\n\nconst tema = ($json.tema || \"\").toString().trim();\nconst normalizar = (s) => s.normalize(\"NFD\").replace(/[̀-ͯ]/g, \"\").toLowerCase();\nlet escolhido = tema\n  ? banco.find((r) => normalizar(tema).includes(normalizar(r.tema)) || normalizar(r.tema).includes(normalizar(tema)))\n  : null;\nif (!escolhido) {\n  const inicio = new Date(new Date().getFullYear(), 0, 0);\n  const diaDoAno = Math.floor((Date.now() - inicio) / 86400000);\n  escolhido = banco[diaDoAno % banco.length];\n}\nreturn [{ json: { ...escolhido, tema: tema || escolhido.tema, origem: \"banco\" } }];\n"
+      },
+      "notes": "Fallback sem custo: usado com usar_ia=false ou quando a IA falha."
+    },
+    {
+      "id": "2b902313-b460-5494-b98b-861c762a96dd",
+      "name": "Normalizar roteiro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst r = $json;\nconst limpa = (s, n) => (s || '').toString().replace(/\\s+/g, ' ').trim().slice(0, n);\nconst cenas = (r.cenas || []).slice(0, 5).map(c => ({ texto: limpa(c.texto, 90), narracao: limpa(c.narracao || c.texto, 300) }))\n  .filter(c => c.texto);\nif (!r.gancho || cenas.length < 2) throw new Error('Roteiro inválido: precisa de gancho e ao menos 2 cenas');\nconst hashtags = [...new Set((r.hashtags || []).map(h => '#' + h.replace(/^#/, '').replace(/\\s+/g, '')))].slice(0, 6);\nconst titulo = (limpa(r.gancho, 150) + '\\n\\n' + hashtags.join(' ')).slice(0, 2200);\nreturn [{ json: { tema: r.tema || cfg.tema, gancho: limpa(r.gancho, 100), cenas, cta: limpa(r.cta, 90),\n  hashtags, titulo, marca: cfg.marca, origem: r.origem } }];\n"
+      }
+    },
+    {
+      "id": "9696fa61-c050-5d97-adbd-fe3225a1e5c9",
+      "name": "Renderizar vídeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.media_api }}/render",
+        "options": {
+          "timeout": 300000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "notes": "Serviço local: TTS neural pt-BR + slides 1080x1920 + ffmpeg (H.264/AAC)."
+    },
+    {
+      "id": "3dac8f2f-6fe6-5c09-a20a-cd29a791d1d0",
+      "name": "Exigir aprovação?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1660,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7613434e-cec9-5071-b9b2-137071612b06",
+              "leftValue": "={{ $('Config').first().json.exigir_aprovacao }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bbdfe0c8-004a-594f-b94d-838aaaf3b2eb",
+      "name": "Baixar prévia",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1880,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Renderizar vídeo').first().json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "8b298f66-bed4-57b0-89a4-761dc349f1ed",
+      "name": "Telegram: enviar prévia",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2100,
+        0
+      ],
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $('Config').first().json.telegram_chat_id }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ $('Normalizar roteiro').first().json.titulo }}"
+        }
+      },
+      "disabled": true,
+      "notes": "Ative após criar a credencial do bot (BotFather) e preencher telegram_chat_id."
+    },
+    {
+      "id": "2e69b002-35c9-5094-a1a1-6aac174f201f",
+      "name": "Telegram: aprovar?",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        0
+      ],
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $('Config').first().json.telegram_chat_id }}",
+        "message": "=Publicar este vídeo no TikTok?\nTema: {{ $('Normalizar roteiro').first().json.tema }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Publicar",
+            "disapproveLabel": "Descartar"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": 12,
+              "resumeUnit": "hours"
+            }
+          }
+        }
+      },
+      "webhookId": "8b4d8a09-6e89-599d-915c-f52d8bae2b74",
+      "disabled": true,
+      "notes": "Human-in-the-loop: aprova ou descarta antes de publicar."
+    },
+    {
+      "id": "6a4ddadf-e6aa-5cf6-9392-c847e817a66b",
+      "name": "Aprovado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2540,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e1f85a24-5e01-52dd-ac48-04d518f52a85",
+              "leftValue": "={{ $json.data?.approved }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "55164b7c-5887-51f6-93a5-0a36ad505596",
+      "name": "Registrar descarte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2760,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.media_api }}/log",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tema: $('Normalizar roteiro').first().json.tema, titulo: $('Normalizar roteiro').first().json.gancho, status: 'DESCARTADO', video: $('Renderizar vídeo').first().json.video_url, modo: 'aprovacao' }) }}"
+      }
+    },
+    {
+      "id": "afd8e7c7-eaf7-59a0-a171-37df954d4e86",
+      "name": "Token TikTok válido",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2760,
+        300
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "TikTokAuthFlow01",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Subworkflow: devolve access_token válido (renova com refresh_token) e a base da API."
+    },
+    {
+      "id": "f33de87e-4ecd-510b-b663-5ad485f77a73",
+      "name": "Consultar criador",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2980,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Token TikTok válido').first().json.api_base }}/v2/post/publish/creator_info/query/",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Token TikTok válido').first().json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}"
+      },
+      "notes": "Exigência do TikTok: consultar opções de privacidade antes de postar."
+    },
+    {
+      "id": "991fd115-bf59-5770-bc82-af6de3f0f148",
+      "name": "Preparar post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3090,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst info = $json.data || {};\nconst opcoes = info.privacy_level_options || [];\nif (!opcoes.length) throw new Error('TikTok não retornou opções de privacidade');\n// app não auditado só tem SELF_ONLY; usamos a preferida se estiver disponível\nconst privacidade = opcoes.includes(cfg.privacidade_preferida) ? cfg.privacidade_preferida : opcoes[0];\nconst tam = $('Renderizar vídeo').first().json.tamanho_bytes;\nconst corpo = {\n  post_info: { title: $('Normalizar roteiro').first().json.titulo, privacy_level: privacidade,\n    disable_duet: !!info.duet_disabled, disable_comment: !!info.comment_disabled,\n    disable_stitch: !!info.stitch_disabled, video_cover_timestamp_ms: 1000, is_aigc: true },\n  source_info: { source: 'FILE_UPLOAD', video_size: tam, chunk_size: tam, total_chunk_count: 1 },\n};\nreturn [{ json: { privacidade, conta: info.creator_username, corpo } }];\n"
+      }
+    },
+    {
+      "id": "f2e254bd-c861-5010-986f-26ecd89afa62",
+      "name": "Iniciar publicação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3200,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Token TikTok válido').first().json.api_base }}/v2/post/publish/video/init/",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Token TikTok válido').first().json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.corpo) }}"
+      },
+      "notes": "Direct Post, FILE_UPLOAD em 1 chunk (vídeo < 64 MB). is_aigc=true: conteúdo gerado por IA."
+    },
+    {
+      "id": "48978c8f-1eb0-54ad-b49c-8bb63fea391e",
+      "name": "Baixar vídeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3420,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Renderizar vídeo').first().json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "38240f7a-5718-5d35-980d-c535644b9b72",
+      "name": "Enviar vídeo (PUT)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3640,
+        300
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Iniciar publicação').first().json.data.upload_url }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            },
+            {
+              "name": "Content-Range",
+              "value": "=bytes 0-{{ $('Renderizar vídeo').first().json.tamanho_bytes - 1 }}/{{ $('Renderizar vídeo').first().json.tamanho_bytes }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data"
+      }
+    },
+    {
+      "id": "d922b1cc-6c66-5fdb-952a-121e7925abec",
+      "name": "Aguardar processamento",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3860,
+        300
+      ],
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "webhookId": "0aa9353f-c691-51c9-ab55-3626eeab43b0"
+    },
+    {
+      "id": "fa89868c-e0d5-59f3-9731-d9209a5d2a79",
+      "name": "Consultar status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4080,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Token TikTok válido').first().json.api_base }}/v2/post/publish/status/fetch/",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Token TikTok válido').first().json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ publish_id: $('Iniciar publicação').first().json.data.publish_id }) }}"
+      }
+    },
+    {
+      "id": "e8acc33a-af77-5b11-9a11-4593bf08e6c2",
+      "name": "Publicado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4300,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cc6630ca-0c92-585a-bad6-2e1d4c314b49",
+              "leftValue": "={{ $json.data.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "PUBLISH_COMPLETE"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e63c0262-ff14-59d7-9617-f58fbbd15191",
+      "name": "Falhou ou esgotou?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4520,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cf08e824-99d4-5f6d-9513-ae59539bec22",
+              "leftValue": "={{ $json.data.status === 'FAILED' || $runIndex >= 24 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d747ccc4-65ad-5e9b-ab28-01873f00517a",
+      "name": "Erro na publicação",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        4740,
+        440
+      ],
+      "parameters": {
+        "errorMessage": "=Publicação falhou: status {{ $json.data.status }} {{ $json.data.fail_reason || '' }}"
+      }
+    },
+    {
+      "id": "0eb5cd95-4751-5e31-90c4-4d1e64a80976",
+      "name": "Registrar no log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4520,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.media_api }}/log",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  tema: $('Normalizar roteiro').first().json.tema,\n  titulo: $('Normalizar roteiro').first().json.gancho,\n  publish_id: $('Iniciar publicação').first().json.data.publish_id,\n  status: $json.data.status,\n  privacidade: $('Preparar post').first().json.privacidade,\n  video: $('Renderizar vídeo').first().json.video_url,\n  modo: $('Token TikTok válido').first().json.api_base.includes('mock') ? 'simulador' : 'api-real'\n}) }}"
+      }
+    },
+    {
+      "id": "c96dd8f3-cc0a-514a-9e60-911e2a466dbd",
+      "name": "Resultado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4740,
+        200
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e2e2aed7-ba41-5d5f-b785-ada5b5f994d2",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "ce7dd69f-204e-50b2-ab9b-b735ab0368f2",
+              "name": "status",
+              "value": "={{ $('Consultar status').last().json.data.status }}",
+              "type": "string"
+            },
+            {
+              "id": "77188788-68c0-508b-8281-bf7cac5f65f1",
+              "name": "publish_id",
+              "value": "={{ $('Iniciar publicação').first().json.data.publish_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ca87ba69-934d-5459-8819-686519966963",
+              "name": "tema",
+              "value": "={{ $('Normalizar roteiro').first().json.tema }}",
+              "type": "string"
+            },
+            {
+              "id": "5ca18995-7ed2-53b6-88b3-0a193c875740",
+              "name": "legenda",
+              "value": "={{ $('Normalizar roteiro').first().json.titulo }}",
+              "type": "string"
+            },
+            {
+              "id": "b527aec0-df0f-52c8-953b-fc69bc03daa3",
+              "name": "privacidade",
+              "value": "={{ $('Preparar post').first().json.privacidade }}",
+              "type": "string"
+            },
+            {
+              "id": "8a6b886c-34b1-5723-a38d-3eb57fc52791",
+              "name": "roteiro_origem",
+              "value": "={{ $('Normalizar roteiro').first().json.origem }}",
+              "type": "string"
+            },
+            {
+              "id": "fbd4abd4-f30d-5971-abbb-aeb4924a7b1b",
+              "name": "video_url",
+              "value": "={{ $('Renderizar vídeo').first().json.video_url }}",
+              "type": "string"
+            },
+            {
+              "id": "3bf5e28c-296c-539f-9983-a3488d97ba13",
+              "name": "duracao_seg",
+              "value": "={{ $('Renderizar vídeo').first().json.duracao_seg }}",
+              "type": "number"
+            },
+            {
+              "id": "96368de9-1126-5760-9ec2-83cbfc5edc8f",
+              "name": "modo",
+              "value": "={{ $('Token TikTok válido').first().json.api_base.includes('mock') ? 'simulador' : 'api-real' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Testar agora": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendado (diário 11h)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formulário (tema manual)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamado via MCP / outro workflow": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Usar IA?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usar IA?": {
+      "main": [
+        [
+          {
+            "node": "Claude: gerar roteiro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Banco de roteiros",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: gerar roteiro": {
+      "main": [
+        [
+          {
+            "node": "Ler resposta da IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Banco de roteiros",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler resposta da IA": {
+      "main": [
+        [
+          {
+            "node": "Normalizar roteiro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Banco de roteiros",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Banco de roteiros": {
+      "main": [
+        [
+          {
+            "node": "Normalizar roteiro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar roteiro": {
+      "main": [
+        [
+          {
+            "node": "Renderizar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renderizar vídeo": {
+      "main": [
+        [
+          {
+            "node": "Exigir aprovação?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exigir aprovação?": {
+      "main": [
+        [
+          {
+            "node": "Baixar prévia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Token TikTok válido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar prévia": {
+      "main": [
+        [
+          {
+            "node": "Telegram: enviar prévia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: enviar prévia": {
+      "main": [
+        [
+          {
+            "node": "Telegram: aprovar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: aprovar?": {
+      "main": [
+        [
+          {
+            "node": "Aprovado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aprovado?": {
+      "main": [
+        [
+          {
+            "node": "Token TikTok válido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar descarte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token TikTok válido": {
+      "main": [
+        [
+          {
+            "node": "Consultar criador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar criador": {
+      "main": [
+        [
+          {
+            "node": "Preparar post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar post": {
+      "main": [
+        [
+          {
+            "node": "Iniciar publicação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Iniciar publicação": {
+      "main": [
+        [
+          {
+            "node": "Baixar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar vídeo": {
+      "main": [
+        [
+          {
+            "node": "Enviar vídeo (PUT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar vídeo (PUT)": {
+      "main": [
+        [
+          {
+            "node": "Aguardar processamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar processamento": {
+      "main": [
+        [
+          {
+            "node": "Consultar status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar status": {
+      "main": [
+        [
+          {
+            "node": "Publicado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicado?": {
+      "main": [
+        [
+          {
+            "node": "Registrar no log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falhou ou esgotou?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falhou ou esgotou?": {
+      "main": [
+        [
+          {
+            "node": "Erro na publicação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar processamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar no log": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "TikTokErrors0001",
+    "callerPolicy": "any"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
