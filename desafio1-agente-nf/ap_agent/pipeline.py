@@ -54,6 +54,16 @@ def _processar_extraido(caminho: Path, doc: DocumentoFiscal, usar_llm, db_path, 
     return resumo
 
 
+def processar_emails(usar_llm: bool | None = None, processar: bool = True) -> dict:
+    """Busca anexos nos e-mails não lidos e (opcionalmente) processa os arquivos recebidos."""
+    from .ingest_email import buscar_anexos_email
+
+    recebido = buscar_anexos_email()
+    resultados = processar_pasta(usar_llm=usar_llm, arquivos=recebido["arquivos"]) \
+        if processar and recebido["arquivos"] else []
+    return {"emails": recebido["emails"], "resultados": resultados}
+
+
 def arquivos_da_pasta(pasta: Path | None = None) -> list[Path]:
     return sorted(p for p in (pasta or config.INBOX_DIR).iterdir() if p.suffix.lower() in EXTENSOES)
 

@@ -33,6 +33,7 @@ Se o PowerShell bloquear scripts: `powershell -ExecutionPolicy Bypass -File .\de
 | 7 | Aba **Vencimentos** | O que pagar nos próximos dias, com total (a NF que vence em 2 dias aparece como prioridade) |
 | 8 | Aba **Auditoria** | Toda decisão com autor (regra, agente ou `humano:<nome>`) e horário |
 | 9 | Barra lateral → envie um XML da pasta `inbox/` de novo → **Processar arquivo enviado** | Rejeitado na hora por **duplicidade** |
+| 10 | Com o e-mail configurado (README do Desafio 1): mande para a caixa de teste um e-mail com notas anexadas e clique em **Buscar e-mails** | Os anexos chegam sozinhos à inbox e aparecem decididos; a Auditoria mostra `EMAIL_RECEBIDO` |
 
 ### Conversando com o agente (MCP)
 
@@ -45,6 +46,7 @@ No Claude Code, peça em linguagem natural:
 - "Aprove a pendência 4, o reajuste foi acordado por e-mail. Meu nome é Paulo."
 - "Quanto tenho a pagar nos próximos 7 dias?"
 - "Me mostra o histórico do fornecedor de embalagens."
+- "Busque as notas novas no e-mail e me diga o que precisa da minha atenção."
 
 ### Só pelo terminal
 
@@ -54,7 +56,17 @@ python -m ap_agent processar --offline
 python -m ap_agent pendencias
 python -m ap_agent vencimentos --dias 7
 python -m ap_agent exportar             # data/export/lancamentos.xlsx
+python -m ap_agent ler-email            # busca notas no e-mail configurado
 ```
+
+### Com notas reais
+
+```powershell
+cd desafio1-agente-nf
+python scripts\preparar_notas_reais.py "C:\caminho\das\suas\notas" --processar
+```
+
+Mostra a decisão de cada nota real. Detalhes no README do Desafio 1.
 
 ---
 
@@ -95,16 +107,3 @@ workflow de autenticação para `https://open.tiktokapis.com`. O vídeo aparece 
 teste, como **privado** (regra do TikTok para apps ainda não auditados).
 
 ---
-
-## Roteiro do vídeo de demonstração (3 a 5 min)
-
-| Tempo | Cena | Fala sugerida |
-|---|---|---|
-| 0:00–0:20 | README raiz | "Dois desafios: um agente financeiro com IA e um fluxo n8n que publica no TikTok, ambos com MCP." |
-| 0:20–0:40 | Slide/README: a dor | "O financeiro digita notas, confere pedido no olho e cai em golpe de boleto." |
-| 0:40–2:00 | Painel D1, passos 1 a 5 e 9 | "Processou tudo em segundos, só 3 exceções para mim, e barrou fraude e duplicidade." |
-| 2:00–2:30 | Claude Code + MCP D1 | "Também converso com o agente: o que está pendente? aprove a 4." |
-| 2:30–2:50 | Plano de implantação | "Cronograma de 10 semanas, custo de ≈ US$ 27/mês de IA, payback em 1 a 3 meses, riscos mapeados." |
-| 2:50–4:10 | n8n, passos 1 a 6 | "O roteiro vira vídeo com narração e é publicado pela API oficial do TikTok." |
-| 4:10–4:40 | MCP no n8n | "E posso pedir o post em linguagem natural." |
-| 4:40–5:00 | Diferenciais | "Aprovação humana, fallback sem IA, tratamento de erros e custo praticamente zero." |

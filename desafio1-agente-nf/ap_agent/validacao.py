@@ -6,7 +6,7 @@ O LLM nunca pode aprovar um documento que tenha verificação CRITICA (garantido
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 
 from . import cadastros, config, store
 from .brutils import chave_acesso_valida, cnpj_valido, decodificar_linha_digitavel, formatar_cnpj
@@ -56,11 +56,28 @@ def validar_nota(doc: DocumentoFiscal) -> list[Verificacao]:
     return out
 
 
+def inferir_pedido(doc: DocumentoFiscal) -> str | None:
+    """Notas reais raramente trazem o pedido (xPed). Procura o único pedido do mesmo fornecedor que
+    contém todos os itens da nota, como um analista faria. Ambíguo ou inexistente -> None."""
+    codigos = {it.codigo for it in doc.itens if it.codigo}
+    if not codigos:
+        return None
+    candidatos = [num for num, p in cadastros.pedidos().items()
+                  if p["cnpj_fornecedor"] == doc.cnpj_emitente and codigos <= set(p["itens"])]
+    return candidatos[0] if len(candidatos) == 1 else None
+
+
 def validar_match_pedido(doc: DocumentoFiscal) -> list[Verificacao]:
     """3-way match: NF × pedido de compra × recebimento físico."""
     out = []
     if not doc.pedido_compra:
-        return [_v("pedido", ALERTA, "Nota sem referência a pedido de compra")]
+        inferido = inferir_pedido(doc)
+        if not inferido:
+            return [_v("pedido", ALERTA, "Nota sem referência a pedido de compra e nenhum pedido único do "
+                                         "fornecedor com estes itens")]
+        doc.pedido_compra = inferido  # fica gravado no lançamento
+        out.append(_v("pedido_inferido", OK, f"Pedido {inferido} identificado pelo fornecedor e pelos itens "
+                                              "(a nota não informava o pedido)"))
     ped = cadastros.pedidos().get(doc.pedido_compra)
     if not ped:
         return [_v("pedido", CRITICO, f"Pedido {doc.pedido_compra} não encontrado")]
@@ -129,8 +146,21 @@ def validar_boleto(doc: DocumentoFiscal, con: sqlite3.Connection) -> list[Verifi
 
 def validar_vencimento(doc: DocumentoFiscal, hoje: date | None = None) -> list[Verificacao]:
     hoje = hoje or date.today()
+    calculado = None
     if not doc.data_vencimento:
-        return [_v("vencimento", ALERTA, "Sem data de vencimento")]
+        # Sem duplicata na nota: usa o prazo de pagamento padrão do fornecedor, se cadastrado.
+        prazo = (cadastros.fornecedores().get(doc.cnpj_emitente) or {}).get("prazo_pagamento_dias")
+        if not (prazo and doc.data_emissao and doc.tipo != TipoDocumento.BOLETO):
+            return [_v("vencimento", ALERTA, "Sem data de vencimento")]
+        doc.data_vencimento = doc.data_emissao + timedelta(days=int(prazo))
+        calculado = _v("vencimento_calculado", OK, f"Nota sem duplicata: vencimento {doc.data_vencimento:%d/%m/%Y} "
+                                                  f"pelo prazo padrão do fornecedor ({prazo} dias da emissão)")
+    out = [calculado] if calculado else []
+    out += _classificar_vencimento(doc, hoje)
+    return out
+
+
+def _classificar_vencimento(doc: DocumentoFiscal, hoje: date) -> list[Verificacao]:
     dias = (doc.data_vencimento - hoje).days
     if dias < 0:
         return [_v("vencimento", ALERTA, f"Vencido há {-dias} dia(s): juros/multa")]

@@ -104,45 +104,26 @@ def _executar_ferramenta(nome: str, args: dict, con: sqlite3.Connection) -> str:
 
 def decidir_com_agente(doc: DocumentoFiscal, verificacoes: list[Verificacao],
                        con: sqlite3.Connection, max_turnos: int = 6) -> Decisao | None:
-    """Roda o loop agêntico. Devolve None se a API falhar (o chamador usa as regras)."""
-    import anthropic
+    """Roda o loop agêntico no provedor configurado. Devolve None se a IA falhar (o chamador usa as regras)."""
+    from .llm import provedor
 
-    client = anthropic.Anthropic()
     caso = {
         "documento": doc.model_dump(mode="json"),
         "verificacoes": [v.model_dump(mode="json") for v in verificacoes],
         "decisao_das_regras": decidir_por_regras(verificacoes).model_dump(mode="json"),
     }
-    messages: list = [{"role": "user", "content": "Analise o caso abaixo e registre a decisão.\n\n"
-                       + json.dumps(caso, ensure_ascii=False, indent=1)}]
+    pedido = "Analise o caso abaixo e registre a decisão.\n\n" + json.dumps(caso, ensure_ascii=False, indent=1)
     try:
-        for _ in range(max_turnos):
-            resp = client.messages.create(
-                model=config.MODELO_AGENTE, max_tokens=8000, system=SYSTEM, tools=TOOLS,
-                output_config={"effort": "medium"}, messages=messages,
-            )
-            # Mantém o conteúdo completo (inclui blocos de thinking) no histórico.
-            messages.append({"role": "assistant", "content": resp.content})
-            if resp.stop_reason != "tool_use":
-                messages.append({"role": "user", "content": "Finalize chamando registrar_decisao."})
-                continue
-            resultados = []
-            for bloco in resp.content:
-                if bloco.type != "tool_use":
-                    continue
-                if bloco.name == "registrar_decisao":
-                    a = bloco.input
-                    texto = a["justificativa"] + (f"\nAção sugerida: {a['acao_sugerida']}" if a.get("acao_sugerida") else "")
-                    return Decisao(status=Status(a["status"]), justificativa=texto,
-                                   decidido_por=f"agente:{config.MODELO_AGENTE}")
-                resultados.append({"type": "tool_result", "tool_use_id": bloco.id,
-                                   "content": _executar_ferramenta(bloco.name, bloco.input, con)})
-            messages.append({"role": "user", "content": resultados})
-    except anthropic.APIError as e:
-        log.warning("Agente indisponível (%s); usando decisão por regras", e)
+        r = provedor().rodar_agente(SYSTEM, TOOLS, pedido, lambda nome, args: _executar_ferramenta(nome, args, con),
+                                    max_turnos)
+    except Exception as e:  # erro inesperado de rede/SDK: nunca derruba o processamento
+        log.warning("Agente falhou (%s); usando decisão por regras", e)
         return None
-    log.warning("Agente não concluiu em %d turnos", max_turnos)
-    return None
+    if not r:
+        return None
+    acao = r.get("acao_sugerida") or ""
+    texto = r["justificativa"] + (f"\nAção sugerida: {acao}" if acao else "")
+    return Decisao(status=Status(r["status"]), justificativa=texto, decidido_por=f"agente:{r['modelo']}")
 
 
 def decidir(doc: DocumentoFiscal, verificacoes: list[Verificacao], con: sqlite3.Connection,

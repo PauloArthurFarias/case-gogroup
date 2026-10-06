@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from ap_agent import config, store  # noqa: E402
 from ap_agent.models import Status  # noqa: E402
-from ap_agent.pipeline import arquivos_da_pasta, processar_documento, processar_pasta  # noqa: E402
+from ap_agent.pipeline import arquivos_da_pasta, processar_documento, processar_emails, processar_pasta  # noqa: E402
 
 st.set_page_config(page_title="Agente de Contas a Pagar", page_icon="🧾", layout="wide")
 ICONE = {"APROVADO": "🟢", "REVISAO": "🟡", "REJEITADO": "🔴", "PAGO": "🔵"}
@@ -27,9 +27,8 @@ def carregar() -> pd.DataFrame:
 
 
 st.title("🧾 Agente de Contas a Pagar")
-modo = f"Claude API ({config.MODELO_EXTRACAO} / {config.MODELO_AGENTE})" if config.llm_disponivel() \
-    else "offline: regras determinísticas + extração por regex"
-st.caption(f"Modo: {modo}. Dados 100% fictícios.")
+modo = config.descricao_llm()
+st.caption(f"IA: {modo} · Base de dados: {config.DB_PATH.parent.name}/{config.DB_PATH.name}")
 
 with st.sidebar:
     st.header("Entrada")
@@ -40,6 +39,22 @@ with st.sidebar:
         with st.spinner(f"Processando {len(novos)} documento(s)..."):
             res = processar_pasta(arquivos=novos)
         st.success(f"{len(res)} processado(s)")
+    if config.email_configurado():
+        if st.button(f"Buscar e-mails ({config.EMAIL_USUARIO})", width="stretch"):
+            with st.spinner("Lendo a caixa de e-mail..."):
+                try:
+                    r = processar_emails()
+                except Exception as e:
+                    st.error(f"Falha ao ler e-mails: {e}")
+                    r = None
+            if r is not None:
+                n_arq = sum(len(e["arquivos"]) for e in r["emails"])
+                st.success(f"{len(r['emails'])} e-mail(s) novo(s), {n_arq} anexo(s) processado(s)")
+                for res in r["resultados"]:
+                    st.write(f"{ICONE.get(res['status'], '')} {res['arquivo']}: {res['status']}")
+    else:
+        st.button("Buscar e-mails", disabled=True, width="stretch",
+                  help="Configure AP_EMAIL_USUARIO e AP_EMAIL_SENHA no .env")
     enviado = st.file_uploader("Enviar NF-e (XML) / DANFE / boleto (PDF)", type=["xml", "pdf"])
     if enviado and st.button("Processar arquivo enviado", width="stretch"):
         destino = config.INBOX_DIR / enviado.name

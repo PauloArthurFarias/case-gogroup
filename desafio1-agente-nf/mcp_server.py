@@ -22,7 +22,7 @@ from mcp.server.mcpserver import MCPServer  # noqa: E402
 from ap_agent import cadastros, config, store  # noqa: E402
 from ap_agent.brutils import so_digitos  # noqa: E402
 from ap_agent.models import Status  # noqa: E402
-from ap_agent.pipeline import arquivos_da_pasta, processar_documento, processar_pasta  # noqa: E402
+from ap_agent.pipeline import arquivos_da_pasta, processar_documento, processar_emails, processar_pasta  # noqa: E402
 
 mcp = MCPServer("contas-a-pagar", instructions="Agente de Contas a Pagar: processa NF-e/boletos, valida contra pedidos e recebimentos e gerencia a fila de revisão.")
 
@@ -48,6 +48,19 @@ def processar_documentos(arquivo: str | None = None) -> list[dict]:
     with store.conexao() as con:
         ja = {r["arquivo"] for r in store.listar(con)}
     return processar_pasta(arquivos=[p for p in arquivos_da_pasta() if p.name not in ja])
+
+
+@mcp.tool()
+def buscar_emails(processar: bool = True) -> dict:
+    """Lê a caixa de e-mail configurada, baixa os anexos XML/PDF das mensagens não lidas para a inbox
+    e (por padrão) já processa cada documento. Retorna remetente, assunto e anexos de cada e-mail e,
+    se processado, o status de cada documento. As mensagens são marcadas como lidas, nunca apagadas.
+    """
+    if not config.email_configurado():
+        return {"erro": "E-mail não configurado: preencha AP_EMAIL_USUARIO e AP_EMAIL_SENHA no .env"}
+    r = processar_emails(processar=processar)
+    return {"emails": r["emails"],
+            "documentos": [{k: d.get(k) for k in ("arquivo", "status", "justificativa")} for d in r["resultados"]]}
 
 
 @mcp.tool()

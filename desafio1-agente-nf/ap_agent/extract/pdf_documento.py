@@ -1,15 +1,14 @@
 """Extração de DANFE/boleto em PDF.
 
-Caminho principal: Claude lê o PDF nativamente (bloco `document`) e devolve JSON validado
-pelo schema Pydantic `ExtracaoLLM` (structured outputs). Se a confiança vier baixa, a
-extração é refeita no modelo mais forte.
+Caminho principal: o provedor de IA configurado (ver `llm.py`) devolve um `ExtracaoLLM`
+validado pelo schema Pydantic. Com o Claude, o PDF vai inteiro e, se a confiança vier baixa,
+a extração é refeita no modelo mais forte.
 
-Sem chave de API, cai para um extrator por regex sobre o texto do PDF (pypdf). Ele é
+Sem chave de API (ou se a IA falhar), cai para um extrator por regex sobre o texto do PDF (pypdf). Ele é
 propositalmente conservador: confiança 0.6, então o documento sempre passa por revisão humana.
 """
 from __future__ import annotations
 
-import base64
 import logging
 import re
 from datetime import date, datetime
@@ -21,17 +20,6 @@ from ..models import DocumentoFiscal, ExtracaoLLM, Item, TipoDocumento
 
 log = logging.getLogger(__name__)
 
-PROMPT_EXTRACAO = """Você é um analista de contas a pagar. Extraia os dados deste documento fiscal brasileiro
-(DANFE de NF-e ou boleto bancário) exatamente como aparecem.
-
-Regras:
-- CNPJs, chave de acesso e linha digitável: somente dígitos.
-- Datas no formato AAAA-MM-DD. Valores numéricos com ponto decimal (1234.56).
-- Em boleto, `cnpj_emitente`/`nome_emitente` são do BENEFICIÁRIO e `itens` fica vazio.
-- Procure o número do pedido de compra (ex.: "PC-1005") em dados adicionais/observações.
-- Não invente campos ausentes: use null.
-- `confianca`: reduza se algum campo estiver ilegível, ambíguo ou se os totais não fecharem."""
-
 
 def _parse_data(valor: str | None) -> date | None:
     if not valor:
@@ -42,29 +30,6 @@ def _parse_data(valor: str | None) -> date | None:
         except ValueError:
             pass
     return None
-
-
-def _extrair_com_claude(caminho: Path, modelo: str) -> ExtracaoLLM:
-    import anthropic
-
-    client = anthropic.Anthropic()
-    pdf_b64 = base64.standard_b64encode(caminho.read_bytes()).decode()
-    resposta = client.messages.parse(
-        model=modelo,
-        max_tokens=4096,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "document",
-                 "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
-                {"type": "text", "text": PROMPT_EXTRACAO},
-            ],
-        }],
-        output_format=ExtracaoLLM,
-    )
-    log.info("Extração %s via %s: %s tokens in / %s out", caminho.name, modelo,
-             resposta.usage.input_tokens, resposta.usage.output_tokens)
-    return resposta.parsed_output
 
 
 def _brl(txt: str) -> float:
@@ -126,16 +91,15 @@ def _extrair_por_regex(caminho: Path) -> ExtracaoLLM:
 
 
 def extrair_pdf(caminho: Path) -> DocumentoFiscal:
+    bruto, metodo = None, "regex-offline"
     if config.llm_disponivel():
-        bruto = _extrair_com_claude(caminho, config.MODELO_EXTRACAO)
-        metodo = f"llm:{config.MODELO_EXTRACAO}"
-        if bruto.confianca < config.CONFIANCA_MINIMA and config.MODELO_AGENTE != config.MODELO_EXTRACAO:
-            log.info("Confiança %.2f baixa, escalando para %s", bruto.confianca, config.MODELO_AGENTE)
-            bruto = _extrair_com_claude(caminho, config.MODELO_AGENTE)
-            metodo = f"llm:{config.MODELO_AGENTE}"
-    else:
+        from ..llm import provedor
+        try:
+            bruto, metodo = provedor().extrair_pdf(caminho)
+        except Exception as e:  # IA indisponível ou resposta inválida: cai no modo offline
+            log.warning("Extração por IA falhou para %s (%s); usando regex", caminho.name, e)
+    if bruto is None:
         bruto = _extrair_por_regex(caminho)
-        metodo = "regex-offline"
 
     vencimento = _parse_data(bruto.data_vencimento)
     if bruto.tipo == TipoDocumento.BOLETO and bruto.linha_digitavel and not vencimento:

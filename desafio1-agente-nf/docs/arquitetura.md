@@ -4,9 +4,10 @@
 
 | Camada | Módulo | Responsabilidade | Usa IA? |
 |---|---|---|---|
-| Ingestão | `pipeline.py` | Lista XML/PDF da inbox; notas antes de boletos | Não |
+| Ingestão | `ingest_email.py`, `pipeline.py` | Baixa anexos XML/PDF de e-mails não lidos (IMAP); lista a inbox; notas antes de boletos | Não |
+| Provedores de IA | `llm.py` | Claude (PDF nativo + structured outputs) ou API compatível com OpenAI (OpenRouter/Qwen, Ollama) | Sim |
 | Extração XML | `extract/nfe_xml.py` | Lê NF-e 4.00 (`infNFe`, `det/prod`, `ICMSTot`, `cobr/dup`, `xPed`) | Não |
-| Extração PDF | `extract/pdf_documento.py` | DANFE/boleto → `ExtracaoLLM` via `client.messages.parse` | Sim (Haiku → Sonnet) |
+| Extração PDF | `extract/pdf_documento.py` | DANFE/boleto → `ExtracaoLLM` pelo provedor configurado; falhou → regex | Sim |
 | Dados mestres | `cadastros.py` | Fornecedores, pedidos, recebimentos | Não |
 | Validação | `validacao.py` | 15 regras com severidade OK/ALERTA/CRITICO | Não |
 | Decisão | `agente.py` | Regras + agente com ferramentas + guard-rail | Sim (só exceções) |
@@ -54,6 +55,7 @@ sequenceDiagram
 | `calculo_item`: qtd × unitário = total | ALERTA | NF-e/DANFE |
 | `confianca_extracao` < 85% | ALERTA | PDF |
 | `pedido` existe / referenciado | CRITICO / ALERTA | NF-e/DANFE |
+| `pedido_inferido`: nota sem pedido, mas um único pedido do fornecedor contém todos os itens | OK (informativo) | NF-e/DANFE |
 | `pedido_fornecedor`: pedido é do emitente | CRITICO | NF-e/DANFE |
 | `preco`: unitário acima da tolerância (2%) | ALERTA | NF-e/DANFE |
 | `quantidade_pedido`: faturado > pedido | ALERTA | NF-e/DANFE |
@@ -63,6 +65,7 @@ sequenceDiagram
 | `valor_codigo_barras` = valor impresso | CRITICO | boleto |
 | `boleto_x_nota`: existe NF de lastro | ALERTA / CRITICO | boleto |
 | `vencimento`: vencido / sem data | ALERTA | todos |
+| `vencimento_calculado`: sem duplicata, usa `prazo_pagamento_dias` do fornecedor | OK (informativo) | NF-e/DANFE |
 | `vencimento_proximo` ≤ 3 dias | OK (prioridade) | todos |
 
 ## 4. Modelo de dados (SQLite)

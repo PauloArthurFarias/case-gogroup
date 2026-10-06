@@ -45,7 +45,7 @@ gantt
 
 | Integração | Como | Esforço | Risco |
 |---|---|---|---|
-| E-mail corporativo | Microsoft Graph / Gmail API (OAuth app) ou fluxo n8n gravando anexos na inbox | 3 dias | Baixo |
+| E-mail corporativo | Leitura por IMAP já existe no protótipo (`ingest_email.py`); em produção, trocar a senha de app por OAuth (Microsoft Graph ou Gmail API) | 2 dias | Baixo |
 | ERP: leitura de cadastros/pedidos/recebimentos | API REST do ERP (TOTVS/SAP/Omie) ou view read-only no banco; substitui `cadastros.py` | 5–8 dias | **Médio:** depende da TI/fornecedor do ERP |
 | ERP: escrita do pré-lançamento | API do ERP; só documentos APROVADOS; idempotente pela chave de acesso | 5 dias | Médio |
 | SEFAZ: situação da NF-e / manifestação | Web service de consulta (certificado A1) ou provedor de DF-e | 3 dias | Médio: certificado digital |

@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import config, store
-from .pipeline import processar_documento, processar_pasta
+from .pipeline import processar_documento, processar_emails, processar_pasta
 
 CORES = {"APROVADO": "\033[32m", "REVISAO": "\033[33m", "REJEITADO": "\033[31m", "ERRO": "\033[35m"}
 
@@ -26,7 +26,10 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     pp = sub.add_parser("processar", help="processa um arquivo ou a pasta inbox/")
     pp.add_argument("caminho", nargs="?", type=Path)
-    pp.add_argument("--offline", action="store_true", help="não chama a Claude API")
+    pp.add_argument("--offline", action="store_true", help="não chama a IA")
+    pm = sub.add_parser("ler-email", help="baixa anexos XML/PDF dos e-mails não lidos e processa")
+    pm.add_argument("--so-baixar", action="store_true", help="só salva os anexos na inbox")
+    pm.add_argument("--offline", action="store_true", help="não chama a IA")
     sub.add_parser("pendencias", help="lista documentos em revisão")
     pv = sub.add_parser("vencimentos", help="aprovados a pagar nos próximos N dias")
     pv.add_argument("--dias", type=int, default=7)
@@ -38,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "processar":
         usar_llm = False if a.offline else None
-        modo = "Claude API" if (config.llm_disponivel() and not a.offline) else "offline (regras + regex)"
+        modo = "offline (regras + regex)" if a.offline else config.descricao_llm()
         print(f"Modo: {modo}\n")
         if a.caminho and a.caminho.is_file():
             resultados = [processar_documento(a.caminho, usar_llm)]
@@ -48,6 +51,25 @@ def main(argv: list[str] | None = None) -> int:
             _imprimir(r)
         cont = {s: sum(r["status"] == s for r in resultados) for s in ("APROVADO", "REVISAO", "REJEITADO", "ERRO")}
         print("Resumo:", ", ".join(f"{k}={v}" for k, v in cont.items()))
+    elif a.cmd == "ler-email":
+        if not config.email_configurado():
+            print("E-mail não configurado: preencha AP_EMAIL_USUARIO e AP_EMAIL_SENHA no .env (veja o README).")
+            return 1
+        print(f"Caixa: {config.EMAIL_USUARIO} ({config.EMAIL_IMAP_HOST}) | IA: "
+              f"{'offline (regras + regex)' if a.offline else config.descricao_llm()}\n")
+        r = processar_emails(usar_llm=False if a.offline else None, processar=not a.so_baixar)
+        if not r["emails"]:
+            print("Nenhum e-mail novo.")
+        for e in r["emails"]:
+            print(f"E-mail de {e['remetente']} | {e['assunto']}")
+            for nome in e["arquivos"]:
+                print(f"   salvo: {nome}")
+            for nome in e["ignorados"]:
+                print(f"   ignorado: {nome}")
+        if r["resultados"]:
+            print()
+            for res in r["resultados"]:
+                _imprimir(res)
     elif a.cmd == "pendencias":
         with store.conexao() as con:
             for d in store.listar(con, "REVISAO"):

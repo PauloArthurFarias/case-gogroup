@@ -4,7 +4,7 @@ Agente de IA que automatiza a entrada de documentos fiscais no Contas a Pagar: l
 PDF) e o boleto, valida tudo, faz o **3-way match** (nota × pedido de compra × recebimento físico), barra
 fraudes e duplicidades, e entrega ao analista uma fila só com as exceções, cada uma já explicada.
 
-Construído com **Claude Code**. Usa a **Claude API** para ler PDFs e investigar exceções, e um **servidor MCP**
+Construído com **Claude Code**. Usa IA (Claude, ou um modelo gratuito via OpenRouter) para ler PDFs e investigar exceções, e um **servidor MCP**
 para que o analista (ou o n8n) converse com o agente.
 
 ## A dor
@@ -62,16 +62,20 @@ desafio1-agente-nf/
 │   ├── brutils.py         # CNPJ, chave de acesso (mod 11), boleto FEBRABAN (mod 10/11, fator de vencimento)
 │   ├── extract/
 │   │   ├── nfe_xml.py     # parser NF-e 4.00
-│   │   └── pdf_documento.py  # Claude (structured outputs) + fallback regex
+│   │   └── pdf_documento.py  # IA (via llm.py) + fallback regex
 │   ├── cadastros.py       # fornecedores, pedidos, recebimentos (CSV na demo, ERP em produção)
 │   ├── validacao.py       # regras de negócio (OK / ALERTA / CRITICO)
-│   ├── agente.py          # motor de regras + agente Claude com ferramentas + guard-rail
+│   ├── llm.py             # provedores de IA: Claude ou API compatível com OpenAI (OpenRouter/Qwen)
+│   ├── agente.py          # motor de regras + agente com ferramentas + guard-rail
+│   ├── ingest_email.py    # leitura de e-mail (IMAP) e download dos anexos
 │   ├── store.py           # SQLite: documentos, verificações, auditoria
 │   ├── pipeline.py        # orquestração
 │   └── __main__.py        # CLI
 ├── mcp_server.py          # servidor MCP (stdio ou HTTP)
 ├── dashboard.py           # painel Streamlit
-├── scripts/gerar_dados_ficticios.py
+├── scripts/
+│   ├── gerar_dados_ficticios.py
+│   └── preparar_notas_reais.py   # ambiente separado para testar com NF-e reais
 ├── tests/test_agente.py
 └── docs/
     ├── arquitetura.md
@@ -89,6 +93,7 @@ cp .env.example .env            # opcional: preencha ANTHROPIC_API_KEY para o mo
 
 python scripts/gerar_dados_ficticios.py --limpar   # 11 documentos fictícios na inbox/
 python -m ap_agent processar                      # processa a inbox (use --offline para forçar sem IA)
+python -m ap_agent ler-email                      # busca notas no e-mail (veja abaixo)
 python -m ap_agent pendencias                     # fila de revisão
 python -m ap_agent vencimentos --dias 7
 python -m ap_agent exportar                       # data/export/lancamentos.xlsx
@@ -126,6 +131,7 @@ O `mcp_server.py` expõe o agente como ferramentas MCP:
 | `decidir_pendencia(id, aprovar, justificativa, analista)` | Decisão humana (auditada) |
 | `relatorio_vencimentos(dias)` | Títulos a pagar no horizonte, com total |
 | `consultar_fornecedor(cnpj)` | Cadastro + histórico |
+| `buscar_emails(processar?)` | Lê a caixa de e-mail, baixa anexos XML/PDF e processa |
 | recurso `contas-a-pagar://kpis` | Indicadores do processo |
 
 **Claude Code:**
@@ -134,27 +140,84 @@ O `mcp_server.py` expõe o agente como ferramentas MCP:
 claude mcp add contas-a-pagar -- python "C:/caminho/para/desafio1-agente-nf/mcp_server.py"
 ```
 
-Depois, em linguagem natural: *"processe as notas novas e me diga o que precisa da minha atenção"*,
+Depois, em linguagem natural: *"busque as notas no e-mail"*, *"processe as notas novas e me diga o que precisa da minha atenção"*,
 *"aprove a pendência 4, o reajuste foi acordado por e-mail"*, *"quanto pago esta semana?"*.
 
 **n8n / outros clientes HTTP:** `python mcp_server.py --http` sobe em `http://127.0.0.1:8000/mcp`.
 O nó *MCP Client Tool* do n8n consome essas ferramentas. Isso conecta o Desafio 1 ao Desafio 2.
 
-## Modelos e custos (Claude API)
+## Receber notas por e-mail (IMAP)
 
-| Uso | Modelo padrão | Quando roda |
+O agente lê uma caixa de e-mail, baixa os anexos `.xml` e `.pdf` das mensagens **não lidas** para a inbox
+e já processa cada documento. As mensagens são marcadas como lidas, nunca apagadas. Outros anexos são
+ignorados, há limite de 10 MB por arquivo e o nome do anexo é sanitizado. Cada e-mail gera o evento
+`EMAIL_RECEBIDO` na auditoria.
+
+Configuração com Gmail (caixa criada só para o teste):
+
+1. Ative a **verificação em duas etapas** em <https://myaccount.google.com/security>.
+2. Crie uma **senha de app** em <https://myaccount.google.com/apppasswords>.
+3. No `.env`, preencha `AP_EMAIL_USUARIO` e `AP_EMAIL_SENHA` (os 16 caracteres, sem espaços).
+4. Envie para essa caixa um e-mail com notas anexadas e rode uma destas opções:
+   - `python -m ap_agent ler-email` (`--so-baixar` só salva os anexos);
+   - o botão **Buscar e-mails** no painel;
+   - a ferramenta MCP `buscar_emails`.
+
+Outros provedores: ajuste `AP_EMAIL_IMAP_HOST`, por exemplo `outlook.office365.com`.
+
+## Testar com notas reais
+
+Notas reais não estão no cadastro e não têm pedido de compra, então seriam todas rejeitadas.
+O script abaixo cria, a partir das próprias notas, um ambiente separado em `notas_reais/` (fora do git):
+
+- o emitente como fornecedor;
+- um pedido e um recebimento com os mesmos itens;
+- um prazo de pagamento, porque compras pessoais vêm sem duplicata.
+
+```bash
+python scripts/preparar_notas_reais.py "C:/pasta/com/xmls" --processar               # pedido igual: APROVADO
+python scripts/preparar_notas_reais.py "C:/pasta/com/xmls" --divergente --processar  # pedido 5% menor: REVISAO
+```
+
+Duas funções do agente aparecem aqui e também valem em produção:
+
+- **Pedido identificado automaticamente:** quando a nota não informa o pedido (`xPed`), o agente procura o
+  único pedido do mesmo fornecedor que contém todos os itens.
+- **Prazo padrão do fornecedor:** sem duplicata na nota, o vencimento é a emissão mais a coluna
+  `prazo_pagamento_dias` do cadastro.
+
+Para abrir o painel sobre esse ambiente, defina as pastas antes de iniciar:
+
+```powershell
+$env:AP_DATA_DIR = "<...>\notas_reais\data"
+$env:AP_INBOX_DIR = "<...>\notas_reais\inbox"
+streamlit run dashboard.py
+```
+
+Aceita NF-e (modelo 55) e NFC-e em XML. DANFE em PDF real, sem IA, vai para revisão: a regex foi feita
+para o layout da demo.
+
+## Modelos de IA e custos
+
+A IA é configurável no `.env` (`AP_LLM_PROVEDOR`). Sem chave, tudo funciona em modo offline.
+
+| Provedor | Configuração | Observações |
 |---|---|---|
-| Extração de PDF | `claude-haiku-4-5` ($1 / $5 por MTok) | Só para PDFs (XML não usa IA) |
-| Reextração | `claude-sonnet-5-5` ($2 / $10 por MTok) | Só se a confiança < 85% |
-| Agente investigador | `claude-sonnet-5-5` | Só para documentos com alerta/crítico |
+| **Claude** (padrão) | `ANTHROPIC_API_KEY` | Lê PDF nativamente; extração com `claude-haiku-4-5` ($1 / $5 por MTok), reextração e agente com `claude-sonnet-5-5` ($2 / $10) |
+| **OpenRouter** (modelos gratuitos, ex.: Qwen) | `AP_LLM_PROVEDOR=openai_compat`, `AP_LLM_BASE_URL`, `AP_LLM_API_KEY`, `AP_LLM_MODELO` | Grátis com limite diário. Modelos de texto: o PDF é convertido em texto antes (não lê PDF escaneado). Use só com dados fictícios ou seus |
+| **Ollama** (local) | `AP_LLM_BASE_URL=http://localhost:11434/v1`, `AP_LLM_API_KEY=ollama` | Privado e sem custo, mas pesado para a máquina |
 
-Os modelos são configuráveis no `.env`. Estimativas de custo mensal estão no [plano de implantação](docs/plano-implantacao.md#4-custos).
+Para o modelo gratuito do OpenRouter, escolha em <https://openrouter.ai/models> um modelo com sufixo
+`:free` e suporte a *tools*, e coloque o id em `AP_LLM_MODELO`. Se o modelo falhar, sair do ar ou
+devolver JSON inválido, o sistema volta sozinho para regex e regras.
+
+Estimativas de custo mensal em produção estão no [plano de implantação](docs/plano-implantacao.md#4-custos).
 
 ## Limitações conhecidas
 
 - **Cadastros em CSV:** em produção vêm do ERP (camada isolada em `cadastros.py`).
-- **Ingestão por pasta:** em produção, IMAP/Graph API ou n8n gravando na inbox.
+- **E-mail por IMAP com senha de app:** em produção corporativa (Microsoft 365), o recomendado é OAuth via Graph API.
 - **Sem consulta à SEFAZ:** a situação da NF-e (autorizada/cancelada) entra na fase de integração.
 - **Impostos:** o agente não recalcula ICMS/IPI/retenções, só confere somas.
-- **Teste do modo com IA:** a suíte cobre o loop do agente com um cliente simulado. A validação com a API
-  real exige `ANTHROPIC_API_KEY`.
+- **Teste do modo com IA:** a suíte cobre extração e loop do agente com clientes simulados (Claude e
+  OpenAI-compatível). A validação com um modelo real exige uma chave no `.env`.

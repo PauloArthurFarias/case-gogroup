@@ -151,3 +151,168 @@ def test_loop_do_agente_com_cliente_simulado(ambiente, monkeypatch):
     assert "Pedir NF complementar" in d.justificativa
     resultado_ferramenta = enviados[1]["content"][0]
     assert resultado_ferramenta["type"] == "tool_result" and "LUV-NIT" in resultado_ferramenta["content"]
+
+
+# ------------------------------------------------------- e-mail (IMAP)
+class _ImapFalso:
+    """Imita imaplib.IMAP4_SSL com mensagens em memória."""
+
+    def __init__(self, mensagens: dict[str, bytes]):
+        self.mensagens, self.lidas = mensagens, set()
+
+    def select(self, pasta):
+        return "OK", [b"2"]
+
+    def uid(self, comando, *args):
+        if comando == "SEARCH":
+            return "OK", [" ".join(u for u in self.mensagens if u not in self.lidas).encode()]
+        if comando == "FETCH":
+            return "OK", [(b"1 (BODY[] {n}", self.mensagens[args[0]]), b")"]
+        if comando == "STORE":
+            self.lidas.add(args[0])
+            return "OK", []
+        raise AssertionError(comando)
+
+    def logout(self):
+        pass
+
+
+def _email(assunto: str, anexos: list[tuple[str, bytes]]) -> bytes:
+    from email.message import EmailMessage
+    m = EmailMessage()
+    m["From"], m["To"], m["Subject"] = "fornecedor@exemplo.com", "notas@exemplo.com", assunto
+    m.set_content("Segue a nota.")
+    for nome, dados in anexos:
+        m.add_attachment(dados, maintype="application", subtype="octet-stream", filename=nome)
+    return m.as_bytes()
+
+
+def test_ingestao_email_salva_so_xml_e_pdf_e_marca_lido(ambiente):
+    from ap_agent.ingest_email import buscar_anexos_email
+
+    _, inbox = ambiente
+    xml = (inbox / "nfe_001_aco_ok.xml").read_bytes()
+    imap = _ImapFalso({
+        "7": _email("NF 1001", [("nota.xml", xml), ("../../boleto.pdf", b"%PDF-1.4 teste")]),
+        "8": _email("Fatura", [("virus.exe", b"MZ")]),
+    })
+    destino = inbox.parent / "inbox_email"
+    r = buscar_anexos_email(destino, cliente_imap=imap)
+
+    assert sorted(p.name for p in r["arquivos"]) == ["email7_boleto.pdf", "email7_nota.xml"]
+    assert all(p.parent == destino for p in r["arquivos"])  # nome com ../ não escapa da pasta
+    assert "virus.exe (tipo não aceito)" in r["emails"][1]["ignorados"]
+    assert imap.lidas == {"7", "8"}
+    from ap_agent import store
+    with store.conexao() as con:
+        eventos = [row["evento"] for row in con.execute("SELECT evento FROM auditoria")]
+    assert eventos.count("EMAIL_RECEBIDO") == 2
+
+
+# ------------------------------------------------------ pedido inferido
+def test_pedido_inferido_quando_nota_nao_informa(ambiente):
+    from ap_agent.validacao import validar_match_pedido
+
+    _, inbox = ambiente
+    doc = extrair_nfe_xml(inbox / "nfe_002_embalagens_ok.xml")
+    doc.pedido_compra = None
+    regras = {v.regra: v for v in validar_match_pedido(doc)}
+    assert regras["pedido_inferido"].severidade == Severidade.OK
+    assert doc.pedido_compra == "PC-1002" and "3way_match" in regras
+
+    # ambíguo: o fornecedor ACO tem dois pedidos e a nota não tem itens identificáveis
+    doc2 = extrair_nfe_xml(inbox / "nfe_001_aco_ok.xml")
+    doc2.pedido_compra, doc2.itens = None, []
+    (v,) = validar_match_pedido(doc2)
+    assert v.regra == "pedido" and v.severidade == Severidade.ALERTA
+
+
+def test_vencimento_pelo_prazo_padrao_do_fornecedor(monkeypatch):
+    from ap_agent.validacao import validar_vencimento
+
+    doc = DocumentoFiscal(tipo=TipoDocumento.NFE_XML, cnpj_emitente="123", valor_total=1,
+                          data_emissao=date.today())
+    monkeypatch.setattr(cadastros, "fornecedores", lambda: {"123": {"prazo_pagamento_dias": "30"}})
+    regras = {v.regra for v in validar_vencimento(doc)}
+    assert "vencimento_calculado" in regras and doc.data_vencimento == date.today() + timedelta(days=30)
+
+
+# ------------------------------------------------- pastas configuráveis
+def test_pastas_configuraveis_por_ambiente(tmp_path, monkeypatch):
+    import importlib
+    monkeypatch.setenv("AP_DATA_DIR", str(tmp_path / "d"))
+    monkeypatch.setenv("AP_INBOX_DIR", str(tmp_path / "i"))
+    try:
+        importlib.reload(config)
+        assert config.DATA_DIR == tmp_path / "d" and config.INBOX_DIR == tmp_path / "i"
+        assert config.DB_PATH == tmp_path / "d" / "contas_a_pagar.db"
+    finally:
+        monkeypatch.delenv("AP_DATA_DIR")
+        monkeypatch.delenv("AP_INBOX_DIR")
+        importlib.reload(config)
+
+
+# ------------------------------------- provedor OpenAI-compatível (Qwen etc.)
+def _cliente_openai_falso(roteiro: list):
+    from types import SimpleNamespace as NS
+
+    class Completions:
+        def create(self, **kw):
+            item = roteiro.pop(0)
+            if isinstance(item, Exception):
+                raise item
+            return NS(choices=[NS(message=item)])
+
+    return NS(chat=NS(completions=Completions()))
+
+
+def test_provedor_openai_extrai_pdf_com_fallback_de_formato(ambiente, monkeypatch):
+    import json as _json
+
+    from openai.types.chat import ChatCompletionMessage
+
+    from ap_agent import llm
+    from ap_agent.extract.pdf_documento import extrair_pdf
+
+    _, inbox = ambiente
+    monkeypatch.setattr(config, "LLM_PROVEDOR", "openai_compat")
+    monkeypatch.setattr(config, "LLM_API_KEY", "teste")
+    monkeypatch.setattr(config, "LLM_MODELO", "qwen-teste")
+    resposta = {"tipo": "DANFE_PDF", "cnpj_emitente": "08333777000180", "nome_emitente": "TransLog",
+                "itens": [], "valor_total": 2850.0, "data_vencimento": "2026-12-01", "confianca": 0.95}
+    roteiro = [ValueError("json_schema não suportado"),
+               ChatCompletionMessage(role="assistant", content="```json\n" + _json.dumps(resposta) + "\n```")]
+    monkeypatch.setattr(llm.ProvedorOpenAICompat, "_cliente", lambda self: _cliente_openai_falso(roteiro))
+
+    doc = extrair_pdf(inbox / "danfe_008_frete_somente_pdf.pdf")
+    assert doc.metodo_extracao == "llm:qwen-teste" and doc.confianca_extracao == 0.95
+    assert doc.valor_total == 2850.0
+
+
+def test_provedor_openai_loop_do_agente(ambiente, monkeypatch):
+    from openai.types.chat import ChatCompletionMessage
+
+    from ap_agent import llm, store
+    from ap_agent.validacao import validar_documento
+
+    _, inbox = ambiente
+    monkeypatch.setattr(config, "LLM_PROVEDOR", "openai_compat")
+    monkeypatch.setattr(config, "LLM_MODELO", "qwen-teste")
+
+    def chamada(id_, nome, args):
+        return {"id": id_, "type": "function", "function": {"name": nome, "arguments": args}}
+
+    roteiro = [
+        ChatCompletionMessage(role="assistant", content=None,
+                              tool_calls=[chamada("c1", "consultar_recebimento", '{"pedido": "PC-1004"}')]),
+        ChatCompletionMessage(role="assistant", content=None, tool_calls=[chamada(
+            "c2", "registrar_decisao",
+            '{"status": "REVISAO", "justificativa": "Faltaram 100 luvas.", "acao_sugerida": "Pedir NF complementar."}')]),
+    ]
+    monkeypatch.setattr(llm.ProvedorOpenAICompat, "_cliente", lambda self: _cliente_openai_falso(roteiro))
+
+    doc = extrair_nfe_xml(inbox / "nfe_004_epi_qtd_maior_que_recebida.xml")
+    with store.conexao() as con:
+        d = agente.decidir(doc, validar_documento(doc, con, "h"), con, usar_llm=True)
+    assert d.status == Status.REVISAO and d.decidido_por == "agente:qwen-teste"
+    assert "Pedir NF complementar" in d.justificativa
