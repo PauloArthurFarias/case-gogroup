@@ -1,16 +1,28 @@
 """Gera os workflows n8n (JSON importável) a partir de uma descrição em Python.
 
 Manter os fluxos como código facilita revisão em PR e evita editar JSON gigante à mão.
-Uso: python workflows/src/build.py   -> grava workflows/*.json
+Uso:
+  python workflows/src/build.py          -> workflows/*.json (genéricos, sem segredos: vão para o git)
+  python workflows/src/build.py --local  -> workflows/local/*.json, aplicando workflows/src/local.json
+                                            (ids de credenciais, app TikTok, Telegram; fora do git)
 """
 from __future__ import annotations
 
 import json
+import sys
 import uuid
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent
-OUT = SRC.parent
+LOCAL_MODE = "--local" in sys.argv
+OUT = SRC.parent / "local" if LOCAL_MODE else SRC.parent
+LOCAL: dict = json.loads((SRC / "local.json").read_text(encoding="utf-8")) \
+    if LOCAL_MODE and (SRC / "local.json").exists() else {}
+
+
+def cred(tipo: str, chave: str, nome: str) -> dict:
+    """Referência de credencial do n8n, só no build local (o id existe apenas na instância local)."""
+    return {"credentials": {tipo: {"id": LOCAL[chave], "name": nome}}} if LOCAL.get(chave) else {}
 
 ID_MAIN = "TikTokPostMain01"
 ID_AUTH = "TikTokAuthFlow01"
@@ -48,6 +60,7 @@ class WF:
         wf = {"id": self.wid, "name": self.nome, "nodes": self.nodes, "connections": self.conns,
               "active": False, "settings": {"executionOrder": "v1", **(settings or {})},
               "pinData": {}, "meta": {"templateCredsSetupCompleted": False}, "tags": []}
+        OUT.mkdir(exist_ok=True)
         (OUT / arquivo).write_text(json.dumps(wf, ensure_ascii=False, indent=2), encoding="utf-8")
         print("gerado", arquivo)
 
@@ -112,39 +125,80 @@ def workflow_principal() -> None:
 
     w.node("Config", "n8n-nodes-base.set", 3.4, set_node([
         ("tema", "={{ ($json.tema || '').toString().trim() }}", "string"),
-        ("usar_ia", False, "boolean"),
+        ("usar_ia", True, "boolean"),
+        ("provedor_ia", LOCAL.get("provedor_ia", "openrouter"), "string"),
+        ("modelo_openrouter", LOCAL.get("modelo_openrouter", "nvidia/nemotron-3-super-120b-a12b:free"), "string"),
         ("modelo", "claude-opus-5-5", "string"),
         ("media_api", MEDIA, "string"),
         ("privacidade_preferida", "SELF_ONLY", "string"),
-        ("exigir_aprovacao", False, "boolean"),
-        ("telegram_chat_id", "", "string"),
+        ("exigir_aprovacao", bool(LOCAL.get("exigir_aprovacao", False)), "boolean"),
+        ("telegram_chat_id", str(LOCAL.get("telegram_chat_id", "")), "string"),
         ("marca", "@automacao.na.pratica", "string"),
-    ]), (260, 240), notes="Painel de controle: ligue usar_ia quando houver credencial Anthropic; "
-                          "exigir_aprovacao liga a revisão via Telegram.")
+    ]), (260, 240), notes="Painel de controle. provedor_ia: openrouter (gratuito) ou anthropic. Sem credencial, "
+                          "a IA falha e o banco de roteiros assume. exigir_aprovacao liga a revisão via Telegram.")
     for t in ("Testar agora", "Agendado (diário 11h)", "Formulário (tema manual)", "Chamado via MCP / outro workflow"):
         w.link(t, "Config")
 
     w.node("Usar IA?", "n8n-nodes-base.if", 2.2, if_node("={{ $json.usar_ia }}", VERDADEIRO), (480, 240))
     w.link("Config", "Usar IA?")
+    w.node("Provedor: Claude?", "n8n-nodes-base.if", 2.2,
+           if_node("={{ $json.provedor_ia }}", IGUAL, "anthropic"), (600, 120))
+    w.link("Usar IA?", "Provedor: Claude?", 0)
+
+    schema_roteiro = {
+        "type": "object", "additionalProperties": False,
+        "required": ["tema", "gancho", "cenas", "cta", "hashtags"],
+        "properties": {
+            "tema": {"type": "string"},
+            "gancho": {"type": "string", "description": "Frase de até 12 palavras para prender nos 2 primeiros segundos"},
+            "cenas": {"type": "array", "items": {
+                "type": "object", "additionalProperties": False, "required": ["texto", "narracao"],
+                "properties": {"texto": {"type": "string", "description": "Texto na tela, até 8 palavras"},
+                               "narracao": {"type": "string", "description": "Fala da cena, 1 a 2 frases"}}}},
+            "cta": {"type": "string"},
+            "hashtags": {"type": "array", "items": {"type": "string"}},
+        }}
+    corpo_openrouter = (
+        "={{ JSON.stringify({\n"
+        "  model: $('Config').first().json.modelo_openrouter,\n"
+        "  temperature: 0.8,\n"
+        "  response_format: { type: 'json_schema', json_schema: { name: 'roteiro', schema: "
+        + json.dumps(schema_roteiro, ensure_ascii=False) + " } },\n"
+        "  messages: [\n"
+        "    { role: 'system', content: " + json.dumps(prompt + "\n\nResponda SOMENTE com o JSON do roteiro.",
+                                                      ensure_ascii=False) + " },\n"
+        "    { role: 'user', content: 'Tema: ' + ($('Config').first().json.tema || "
+        "'escolha um tema útil de automação para empresas') }\n"
+        "  ]\n"
+        "}) }}"
+    )
+    w.node("OpenRouter: gerar roteiro", "n8n-nodes-base.httpRequest", 4.2, http(
+        "POST", "https://openrouter.ai/api/v1/chat/completions", corpo_openrouter,
+        [("X-Title", "Case GoGroup - TikTok automatico")],
+        authentication="genericCredentialType", genericAuthType="httpHeaderAuth",
+        options={"timeout": 120000}),
+        (840, 200), onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000,
+        notes="Modelo gratuito via OpenRouter (credencial Header Auth 'OpenRouter'). Falhou? banco de roteiros.",
+        **cred("httpHeaderAuth", "openrouter_cred_id", "OpenRouter"))
+    w.link("Provedor: Claude?", "OpenRouter: gerar roteiro", 1)
+    w.node("Ler resposta (OpenRouter)", "n8n-nodes-base.code", 2, {"jsCode": (
+        "const r = $json;\n"
+        "if (r.error) throw new Error('OpenRouter: ' + JSON.stringify(r.error));\n"
+        "const texto = r.choices?.[0]?.message?.content || '';\n"
+        "const m = texto.match(/\\{[\\s\\S]*\\}/);\n"
+        "if (!m) throw new Error('Resposta sem JSON');\n"
+        "return [{ json: { ...JSON.parse(m[0]), origem: 'ia:' + (r.model || 'openrouter'),\n"
+        "  tokens: r.usage?.total_tokens || 0 } }];\n")},
+        (1060, 200), onError="continueErrorOutput")
+    w.link("OpenRouter: gerar roteiro", "Ler resposta (OpenRouter)", 0)
 
     corpo_claude = (
         "={{ JSON.stringify({\n"
         "  model: $json.modelo,\n"
         "  max_tokens: 4000,\n"
         "  fallbacks: 'default',\n"
-        "  output_config: { effort: 'low', format: { type: 'json_schema', schema: " + json.dumps({
-            "type": "object", "additionalProperties": False,
-            "required": ["tema", "gancho", "cenas", "cta", "hashtags"],
-            "properties": {
-                "tema": {"type": "string"},
-                "gancho": {"type": "string", "description": "Frase de até 12 palavras para prender nos 2 primeiros segundos"},
-                "cenas": {"type": "array", "items": {
-                    "type": "object", "additionalProperties": False, "required": ["texto", "narracao"],
-                    "properties": {"texto": {"type": "string", "description": "Texto na tela, até 8 palavras"},
-                                   "narracao": {"type": "string", "description": "Fala da cena, 1 a 2 frases"}}}},
-                "cta": {"type": "string"},
-                "hashtags": {"type": "array", "items": {"type": "string"}},
-            }}, ensure_ascii=False) + " } },\n"
+        "  output_config: { effort: 'low', format: { type: 'json_schema', schema: "
+        + json.dumps(schema_roteiro, ensure_ascii=False) + " } },\n"
         "  system: " + json.dumps(prompt, ensure_ascii=False) + ",\n"
         "  messages: [{ role: 'user', content: 'Tema: ' + ($json.tema || 'escolha um tema útil de automação para empresas') }]\n"
         "}) }}"
@@ -154,9 +208,9 @@ def workflow_principal() -> None:
         [("anthropic-version", "2023-06-01"), ("anthropic-beta", "server-side-fallback-2026-07-01")],
         authentication="predefinedCredentialType", nodeCredentialType="anthropicApi",
         options={"timeout": 120000}),
-        (720, 120), onError="continueErrorOutput", retryOnFail=True, maxTries=2,
+        (840, 20), onError="continueErrorOutput", retryOnFail=True, maxTries=2,
         notes="Structured output: a resposta é JSON garantido pelo schema. Falhou? cai no banco de roteiros.")
-    w.link("Usar IA?", "Claude: gerar roteiro", 0)
+    w.link("Provedor: Claude?", "Claude: gerar roteiro", 0)
 
     w.node("Ler resposta da IA", "n8n-nodes-base.code", 2, {"jsCode": (
         "const r = $json;\n"
@@ -166,14 +220,16 @@ def workflow_principal() -> None:
         "if (!texto) throw new Error('Resposta sem bloco de texto');\n"
         "return [{ json: { ...JSON.parse(texto), origem: 'ia:' + r.model,\n"
         "  tokens: (r.usage?.input_tokens || 0) + (r.usage?.output_tokens || 0) } }];\n")},
-        (960, 60), onError="continueErrorOutput")
+        (1060, 20), onError="continueErrorOutput")
     w.link("Claude: gerar roteiro", "Ler resposta da IA", 0)
 
-    w.node("Banco de roteiros", "n8n-nodes-base.code", 2, {"jsCode": banco}, (960, 340),
+    w.node("Banco de roteiros", "n8n-nodes-base.code", 2, {"jsCode": banco}, (1060, 400),
            notes="Fallback sem custo: usado com usar_ia=false ou quando a IA falha.")
     w.link("Usar IA?", "Banco de roteiros", 1)
     w.link("Claude: gerar roteiro", "Banco de roteiros", 1)
     w.link("Ler resposta da IA", "Banco de roteiros", 1)
+    w.link("OpenRouter: gerar roteiro", "Banco de roteiros", 1)
+    w.link("Ler resposta (OpenRouter)", "Banco de roteiros", 1)
 
     w.node("Normalizar roteiro", "n8n-nodes-base.code", 2, {"jsCode": (
         "const cfg = $('Config').first().json;\n"
@@ -185,8 +241,9 @@ def workflow_principal() -> None:
         "const hashtags = [...new Set((r.hashtags || []).map(h => '#' + h.replace(/^#/, '').replace(/\\s+/g, '')))].slice(0, 6);\n"
         "const titulo = (limpa(r.gancho, 150) + '\\n\\n' + hashtags.join(' ')).slice(0, 2200);\n"
         "return [{ json: { tema: r.tema || cfg.tema, gancho: limpa(r.gancho, 100), cenas, cta: limpa(r.cta, 90),\n"
-        "  hashtags, titulo, marca: cfg.marca, origem: r.origem } }];\n")}, (1200, 240))
+        "  hashtags, titulo, marca: cfg.marca, origem: r.origem } }];\n")}, (1300, 240))
     w.link("Ler resposta da IA", "Normalizar roteiro", 0)
+    w.link("Ler resposta (OpenRouter)", "Normalizar roteiro", 0)
     w.link("Banco de roteiros", "Normalizar roteiro", 0)
 
     w.node("Renderizar vídeo", "n8n-nodes-base.httpRequest", 4.2, http(
@@ -208,7 +265,9 @@ def workflow_principal() -> None:
         "operation": "sendVideo", "chatId": "={{ $('Config').first().json.telegram_chat_id }}",
         "binaryData": True, "binaryPropertyName": "data",
         "additionalFields": {"caption": "={{ $('Normalizar roteiro').first().json.titulo }}"}}, (2100, 0),
-        disabled=True, notes="Ative após criar a credencial do bot (BotFather) e preencher telegram_chat_id.")
+        disabled=not LOCAL.get("telegram_cred_id"),
+        notes="Ative após criar a credencial do bot (BotFather) e preencher telegram_chat_id.",
+        **cred("telegramApi", "telegram_cred_id", "Telegram"))
     w.link("Baixar prévia", "Telegram: enviar prévia")
     w.node("Telegram: aprovar?", "n8n-nodes-base.telegram", 1.2, {
         "operation": "sendAndWait", "chatId": "={{ $('Config').first().json.telegram_chat_id }}",
@@ -217,7 +276,8 @@ def workflow_principal() -> None:
                                        "disapproveLabel": "Descartar"}},
         "options": {"limitWaitTime": {"values": {"limitType": "afterTimeInterval", "resumeAmount": 12,
                                                  "resumeUnit": "hours"}}}}, (2320, 0),
-        disabled=True, notes="Human-in-the-loop: aprova ou descarta antes de publicar.")
+        disabled=not LOCAL.get("telegram_cred_id"), notes="Human-in-the-loop: aprova ou descarta antes de publicar.",
+        **cred("telegramApi", "telegram_cred_id", "Telegram"))
     w.link("Telegram: enviar prévia", "Telegram: aprovar?")
     w.node("Aprovado?", "n8n-nodes-base.if", 2.2, if_node("={{ $json.data?.approved }}", VERDADEIRO), (2540, 0))
     w.link("Telegram: aprovar?", "Aprovado?")
@@ -340,11 +400,11 @@ def workflow_auth() -> None:
            {"inputSource": "passthrough"}, (0, 600))
 
     cfg = [
-        ("client_key", "PREENCHER_CLIENT_KEY", "string"),
-        ("client_secret", "PREENCHER_CLIENT_SECRET", "string"),
-        ("redirect_uri", "https://SEU-TUNEL.trycloudflare.com/webhook/tiktok/callback", "string"),
+        ("client_key", LOCAL.get("tiktok_client_key", "PREENCHER_CLIENT_KEY"), "string"),
+        ("client_secret", LOCAL.get("tiktok_client_secret", "PREENCHER_CLIENT_SECRET"), "string"),
+        ("redirect_uri", LOCAL.get("tiktok_redirect_uri", "https://SEU-TUNEL.trycloudflare.com/webhook/tiktok/callback"), "string"),
         ("scopes", "user.info.basic,video.publish", "string"),
-        ("api_base", f"{MEDIA}/mock-tiktok", "string"),
+        ("api_base", LOCAL.get("tiktok_api_base", f"{MEDIA}/mock-tiktok"), "string"),
         ("media_api", MEDIA, "string"),
         ("state", "case-gogroup-csrf", "string"),
     ]
