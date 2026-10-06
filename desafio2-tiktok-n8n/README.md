@@ -12,8 +12,9 @@ Fluxo low-code no **n8n** que cria e publica sozinho vídeos curtos no TikTok:
 5. publica pela **TikTok Content Posting API** oficial (Direct Post), acompanha o processamento e registra
    tudo num log. Erros caem num workflow de tratamento, com mensagem clara.
 
-**Publicação real validada em 06/10/2026:** `PUBLISH_COMPLETE` na conta de teste do sandbox
-(`publish_id v_pub_file~v2-1.7693659920302147605`), com aprovação pelo Telegram. Detalhes em
+**Publicação real validada em 06/10/2026:** 4 vídeos chegaram a `PUBLISH_COMPLETE` na conta de teste do
+sandbox, todos aprovados pelo Telegram. O primeiro foi `v_pub_file~v2-1.7693659920302147605`; o último,
+com roteiro do Gemini e o visual completo, foi `v_pub_file~v2-1.7693674964672235540`. Detalhes em
 [Testes realizados](#testes-realizados).
 
 Inspirado no vídeo de referência ("This n8n AI Agent will AUTOMATE your Social Media"). As melhorias estão

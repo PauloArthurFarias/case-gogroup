@@ -26,17 +26,19 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 | Postagem automática no TikTok com low-code, de preferência n8n | 4 workflows n8n ([README D2](desafio2-tiktok-n8n/README.md)) |
 | Publicação automática | TikTok Content Posting API (Direct Post) com OAuth e renovação de token. **Validada com post real** na conta de teste do sandbox |
 | Usuários de teste | Sandbox + conta de teste (privada) no TikTok for Developers, usada no post real ([setup](desafio2-tiktok-n8n/docs/setup-tiktok.md)); simulador da API para testes locais |
-| Inovar / melhorias | Aprovação humana pelo Telegram, IA gratuita com *fallback*, *structured output*, vídeo a custo zero, erros traduzidos em ação, simulador ([diferenciais](desafio2-tiktok-n8n/README.md#diferenciais)) |
+| Inovar / melhorias | Aprovação humana pelo Telegram, IA gratuita em cadeia (OpenRouter → Gemini → banco de roteiros), vídeo com fotos, legendas dinâmicas e trilha própria, *structured output*, vídeo a custo zero, erros traduzidos em ação, simulador ([diferenciais](desafio2-tiktok-n8n/README.md#diferenciais)) |
 | **Se possível, integração com MCP** | **Duas:** servidor MCP do agente financeiro (Python, 8 ferramentas) e servidor MCP no n8n (`criar_post_tiktok`) |
 | Ferramentas pagas só com aprovação | Nada pago foi usado: a demo do D1 roda com modelo gratuito (OpenRouter). Em produção, a recomendação é a Claude API (≈ US$ 27/mês no D1, ≈ US$ 1/mês no D2), sujeita a aprovação |
 
 ## Como foi validado
 
-- **Desafio 1:** 16 testes automatizados (`pytest`), incluindo ponta a ponta com 11 documentos fictícios
+- **Desafio 1:** 18 testes automatizados (`pytest`), incluindo ponta a ponta com 11 documentos fictícios
   (todos com o status esperado), o guard-rail da IA e o loop do agente com cliente simulado. Servidor MCP
-  testado com cliente MCP real. Painel Streamlit testado headless.
-- **Desafio 2:** executado no n8n 2.41.7 local. **Post real** no TikTok (sandbox, conta de teste privada),
-  disparado pelo servidor MCP do n8n e aprovado pelo Telegram, até `PUBLISH_COMPLETE`. OAuth real,
+  testado com cliente MCP real. Painel Streamlit testado headless. Validado com IA real (OpenRouter e,
+  como reserva, Gemini) e com e-mail real.
+- **Desafio 2:** executado no n8n 2.41.7 local. **4 posts reais** no TikTok (sandbox, conta de teste privada),
+  disparados pelo n8n e pelo servidor MCP e aprovados pelo Telegram, até `PUBLISH_COMPLETE`; o último com
+  roteiro escrito pelo Gemini (reserva) e o visual completo (fotos, emojis, legendas palavra a palavra, trilha). OAuth real,
   renovação de token, conta desconectada, recusa da API e falha da IA (fallback) também testados.
   Detalhes em [Testes realizados](desafio2-tiktok-n8n/README.md#testes-realizados).
 

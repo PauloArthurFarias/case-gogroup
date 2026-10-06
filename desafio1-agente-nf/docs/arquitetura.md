@@ -5,7 +5,7 @@
 | Camada | Módulo | Responsabilidade | Usa IA? |
 |---|---|---|---|
 | Ingestão | `ingest_email.py`, `pipeline.py` | Baixa anexos XML/PDF de e-mails não lidos (IMAP); lista a inbox; notas antes de boletos | Não |
-| Provedores de IA | `llm.py` | Claude (PDF nativo + structured outputs) ou API compatível com OpenAI (OpenRouter/Qwen, Ollama) | Sim |
+| Provedores de IA | `llm.py` | Claude (PDF nativo + structured outputs) ou API compatível com OpenAI (OpenRouter, Gemini, Ollama), em cadeia com reservas | Sim |
 | Extração XML | `extract/nfe_xml.py` | Lê NF-e 4.00 (`infNFe`, `det/prod`, `ICMSTot`, `cobr/dup`, `xPed`) | Não |
 | Extração PDF | `extract/pdf_documento.py` | DANFE/boleto → `ExtracaoLLM` pelo provedor configurado; falhou → regex | Sim |
 | Dados mestres | `cadastros.py` | Fornecedores, pedidos, recebimentos | Não |

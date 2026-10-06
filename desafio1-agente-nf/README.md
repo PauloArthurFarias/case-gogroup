@@ -65,7 +65,7 @@ desafio1-agente-nf/
 │   │   └── pdf_documento.py  # IA (via llm.py) + fallback regex
 │   ├── cadastros.py       # fornecedores, pedidos, recebimentos (CSV na demo, ERP em produção)
 │   ├── validacao.py       # regras de negócio (OK / ALERTA / CRITICO)
-│   ├── llm.py             # provedores de IA: Claude ou API compatível com OpenAI (OpenRouter/Qwen)
+│   ├── llm.py             # provedores de IA: Claude ou API compatível com OpenAI (OpenRouter, Gemini), em cadeia
 │   ├── agente.py          # motor de regras + agente com ferramentas + guard-rail
 │   ├── ingest_email.py    # leitura de e-mail (IMAP) e download dos anexos
 │   ├── store.py           # SQLite: documentos, verificações, auditoria
