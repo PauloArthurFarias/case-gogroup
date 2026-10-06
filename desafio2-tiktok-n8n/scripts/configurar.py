@@ -72,7 +72,9 @@ def pexels_ok(chave: str) -> bool:
 
 def pixabay_ok(chave: str) -> bool:
     try:
-        with urllib.request.urlopen(f"https://pixabay.com/api/?key={chave}&q=office&per_page=3", timeout=20) as r:
+        req = urllib.request.Request(f"https://pixabay.com/api/?key={chave}&q=office&per_page=3",
+                                     headers={"User-Agent": "Mozilla/5.0"})  # Cloudflare bloqueia o UA padrão
+        with urllib.request.urlopen(req, timeout=20) as r:
             return bool(json.load(r).get("hits"))
     except Exception:
         return False

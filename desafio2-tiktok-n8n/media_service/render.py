@@ -100,7 +100,8 @@ def _url_pixabay(busca: str, semente: int, chave: str) -> str | None:
     url = "https://pixabay.com/api/?" + urllib.parse.urlencode(
         {"key": chave, "q": busca[:100], "image_type": "photo", "orientation": "vertical", "per_page": 10,
          "safesearch": "true", "min_height": 1200})
-    with urllib.request.urlopen(url, timeout=20) as r:
+    # o Pixabay (atrás do Cloudflare) recusa o User-Agent padrão do Python com "error code: 1010"
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=20) as r:
         fotos = json.load(r).get("hits", [])
     if not fotos:
         return None
@@ -164,7 +165,10 @@ def _slide(c: dict, idx: int, total: int, destino: Path, marca: str, semente: in
     emoji = (c.get("emoji") or "").strip()
     if emoji:
         try:
-            fe = ImageFont.truetype(str(FONTES / "seguiemj.ttf"), 220)
+            fe = ImageFont.truetype(str(FONTES / "seguiemj.ttf"), 170)
+            if com_foto:  # selo circular separa o emoji da foto (rostos, objetos)
+                d.ellipse((W // 2 - 150, 560 - 150, W // 2 + 150, 560 + 150), fill=(10, 15, 35, 170),
+                          outline=DESTAQUE + (255,), width=6)
             d.text((W // 2, 560), emoji, font=fe, embedded_color=True, anchor="mm")
         except Exception:
             pass
