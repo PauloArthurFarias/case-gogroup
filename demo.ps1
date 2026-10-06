@@ -34,6 +34,14 @@ if ($Somente -in "todos", "d1") {
     Push-Location $d1
     python scripts\gerar_dados_ficticios.py --limpar
     Pop-Location
+    # Um painel antigo na mesma porta continuaria com o codigo velho em memoria: encerra antes de subir.
+    $antigos = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
+        Where-Object { $_.CommandLine -match 'streamlit run dashboard\.py' }
+    foreach ($p in $antigos) {
+        Write-Host "[D1] Encerrando painel anterior (PID $($p.ProcessId))..."
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($antigos) { Start-Sleep 2 }
     Write-Host "[D1] Subindo painel Streamlit (nova janela)..."
     Start-Process -FilePath "python" -ArgumentList "-m streamlit run dashboard.py --server.headless true --server.port 8501" -WorkingDirectory $d1
     if (Esperar "http://127.0.0.1:8501/_stcore/health" 60) { Start-Process "http://localhost:8501" }
