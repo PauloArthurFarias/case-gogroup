@@ -1,7 +1,7 @@
 # Como demonstrar
 
 Roteiro para ver as duas aplicações funcionando do ponto de vista do usuário. O Desafio 1 leva cerca de
-15 minutos; o Desafio 2, cerca de 5.
+15 minutos; o Desafio 2, cerca de 10.
 
 > **Memória:** n8n + Streamlit + navegador pesam. Em máquina com pouca RAM, demonstre um desafio por vez
 > (`.\demo.ps1 -Somente d1`, feche, depois `.\demo.ps1 -Somente d2`).
@@ -89,18 +89,32 @@ Mostra a decisão de cada nota real. Detalhes no README do Desafio 1.
 
 **Papel:** quem cuida das redes sociais e quer postar todo dia sem produzir vídeo à mão.
 
-Abra <http://localhost:5678> e entre com `admin@case.local` / `CaseGoGroup2026!`.
+**Antes de começar:** `.\demo.ps1 -Somente d2` sobe o serviço de vídeo e o n8n. Abra <http://localhost:5678>
+e entre com `admin@case.local` / `CaseGoGroup2026!`.
+
+A instância local está configurada no **modo completo**: TikTok real (conta de teste privada), roteiro por IA
+gratuita e aprovação pelo Telegram. Cada publicação vai de verdade para a conta de teste, como vídeo privado.
+Para demonstrar sem conta nenhuma, veja "Modo simulador" no README do Desafio 2.
 
 | Passo | O que fazer | O que observar |
 |---|---|---|
-| 1 | Abra o workflow **TikTok · Post automático com IA** | O fluxo inteiro desenhado: gatilhos → IA/banco de roteiros → vídeo → aprovação → publicação → log |
-| 2 | Clique em **Execute workflow** (gatilho "Testar agora") | Os nós acendem verdes em sequência (~30 s; o vídeo é montado no meio) |
-| 3 | Clique no nó **Normalizar roteiro** | Gancho, cenas, narração, CTA e hashtags gerados |
-| 4 | Clique no nó **Renderizar vídeo** e abra o `video_url` | O vídeo vertical com narração |
-| 5 | Clique em **Iniciar publicação** e **Consultar status** | `publish_id` e `PUBLISH_COMPLETE` devolvidos pela API (simulador) |
-| 6 | Abra <http://127.0.0.1:8765/log> | Histórico de publicações |
-| 7 | Aba **Executions** do n8n | Todas as execuções, inclusive com erro |
-| 8 | Workflow **TikTok · Autenticação** | Login OAuth, callback e renovação automática de token |
+| 1 | Abra o workflow **TikTok · Post automático com IA** | O fluxo desenhado: gatilhos → IA (OpenRouter ou Claude) / banco de roteiros → vídeo → aprovação → publicação → log |
+| 2 | Clique em **Execute workflow** (gatilho "Testar agora") | Os nós acendem em sequência; o fluxo **pausa** em "Telegram: aprovar?" |
+| 3 | No Telegram, abra a conversa com o seu bot | Chegam o vídeo, com a legenda, e a pergunta com os botões **Publicar** / **Descartar** |
+| 4 | Toque em **Publicar** (use o Telegram no próprio computador, Web ou Desktop, ou veja a nota abaixo) | O n8n retoma: token, envio ao TikTok, consulta de status até `PUBLISH_COMPLETE` |
+| 5 | Abra o TikTok com a conta de teste → Perfil | O vídeo publicado, com cadeado (privado) |
+| 6 | No n8n, clique nos nós **Normalizar roteiro**, **Renderizar vídeo** e **Consultar status** | Roteiro gerado (origem `ia:` ou `banco`), link do vídeo, `publish_id` e status |
+| 7 | Abra <http://127.0.0.1:8765/log> | Histórico com `modo: api-real` |
+| 8 | Repita o passo 2 e toque em **Descartar** | Nada é publicado; o log registra `DESCARTADO` |
+| 9 | Aba **Executions** e workflow **TikTok · Autenticação** | Todas as execuções; login OAuth, callback e renovação automática do token |
+
+**Botões do Telegram no celular:** eles abrem um link do n8n. Por padrão, o link é `localhost` e só funciona
+no próprio computador. Para aprovar pelo celular, abra o túnel
+(`$HOME\tools\cloudflared.exe tunnel --url http://localhost:5678`) e inicie o n8n com
+`$env:N8N_WEBHOOK_URL = "<url do túnel>/"` (detalhes em `docs/setup-tiktok.md`).
+
+**Se algo der errado:** a mensagem de erro do fluxo diz o motivo e o que fazer. Por exemplo, "conta precisa
+ser privada" ou "refaça o login". A tabela completa está em `desafio2-tiktok-n8n/docs/setup-tiktok.md`.
 
 ### Publicar conversando com o Claude (MCP)
 
@@ -108,17 +122,12 @@ Abra <http://localhost:5678> e entre com `admin@case.local` / `CaseGoGroup2026!`
 claude mcp add --transport http tiktok-n8n http://localhost:5678/mcp/tiktok
 ```
 
-No Claude Code: *"publica um vídeo sobre golpe do boleto e depois me mostra o histórico"*.
+No Claude Code: *"publica um vídeo sobre golpe do boleto e depois me mostra o histórico"*. Com a aprovação
+ligada, o Claude avisa que o post aguarda a decisão no Telegram.
 Sem Claude Code: `python desafio2-tiktok-n8n\scripts\testar_mcp.py "planilha"`.
 
 ### Pelo formulário
 
 No nó **Formulário (tema manual)**, copie a *Production URL*, abra no navegador, digite um tema e envie.
-
-### Com a conta TikTok real
-
-Depois de seguir [setup-tiktok.md](desafio2-tiktok-n8n/docs/setup-tiktok.md), troque `api_base` no
-workflow de autenticação para `https://open.tiktokapis.com`. O vídeo aparece no app do TikTok da conta de
-teste, como **privado** (regra do TikTok para apps ainda não auditados).
 
 ---

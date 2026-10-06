@@ -67,13 +67,14 @@ def main() -> int:
     if token_tg:
         chat = chat_id_telegram(token_tg)
         if not chat:
-            print("Telegram: mande /start para o seu bot no Telegram e rode de novo.")
-            return 1
-        local["telegram_cred_id"] = n.credencial("Telegram", "telegramApi", {"accessToken": token_tg})
-        local["telegram_chat_id"] = chat
-        local["exigir_aprovacao"] = env.get("EXIGIR_APROVACAO", "true").lower() == "true"
-        print(f"Telegram: credencial configurada, chat encontrado, aprovação "
-              f"{'LIGADA' if local['exigir_aprovacao'] else 'desligada'}")
+            print("Telegram: nenhuma mensagem recebida pelo bot. Mande /start para ele e rode de novo "
+                  "(o resto da configuração segue sem aprovação).")
+        else:
+            local["telegram_cred_id"] = n.credencial("Telegram", "telegramApi", {"accessToken": token_tg})
+            local["telegram_chat_id"] = chat
+            local["exigir_aprovacao"] = env.get("EXIGIR_APROVACAO", "true").lower() == "true"
+            print(f"Telegram: credencial configurada, chat encontrado, aprovação "
+                  f"{'LIGADA' if local['exigir_aprovacao'] else 'desligada'}")
     else:
         print("Telegram: sem token (aprovação humana desligada)")
 

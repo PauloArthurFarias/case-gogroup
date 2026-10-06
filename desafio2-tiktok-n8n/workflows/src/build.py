@@ -320,14 +320,30 @@ def workflow_principal() -> None:
     w.link("Consultar criador", "Preparar post")
     w.node("Iniciar publicação", "n8n-nodes-base.httpRequest", 4.2, http(
         "POST", tiktok_url("/v2/post/publish/video/init/"), "={{ JSON.stringify($json.corpo) }}",
-        tiktok_headers()), (3200, 300),
+        tiktok_headers(), options={"response": {"response": {"neverError": True}}}), (3200, 300),
         notes="Direct Post, FILE_UPLOAD em 1 chunk (vídeo < 64 MB). is_aigc=true: conteúdo gerado por IA.")
     w.link("Preparar post", "Iniciar publicação")
+
+    # O TikTok devolve o motivo da recusa em error.code; traduzimos os casos comuns em ação concreta.
+    w.node("Conferir início", "n8n-nodes-base.code", 2, {"jsCode": (
+        "const e = $json.error || {};\n"
+        "if (e.code === 'ok' && $json.data?.upload_url) return [$input.first()];\n"
+        "const dicas = {\n"
+        "  unaudited_client_can_only_post_to_private_accounts: 'App sem auditoria só publica em CONTA PRIVADA: no TikTok, Configurações e privacidade > Privacidade > Conta privada.',\n"
+        "  access_token_invalid: 'Token inválido ou revogado: refaça o login em /webhook/tiktok/login.',\n"
+        "  scope_not_authorized: 'Falta a permissão video.publish: adicione o escopo no app e refaça o login.',\n"
+        "  spam_risk_too_many_posts: 'Limite diário de posts do TikTok atingido: tente amanhã.',\n"
+        "  rate_limit_exceeded: 'Limite de chamadas da API (6/min): aguarde um minuto.',\n"
+        "  privacy_level_option_mismatch: 'Privacidade escolhida não está entre as opções da conta.',\n"
+        "};\n"
+        "throw new Error('TikTok recusou a publicação (' + (e.code || 'sem código') + '). ' + (dicas[e.code] || e.message || ''));\n")},
+        (3310, 300))
+    w.link("Iniciar publicação", "Conferir início")
 
     w.node("Baixar vídeo", "n8n-nodes-base.httpRequest", 4.2, http(
         "GET", "={{ $('Renderizar vídeo').first().json.video_url }}",
         options={"response": {"response": {"responseFormat": "file", "outputPropertyName": "data"}}}), (3420, 300))
-    w.link("Iniciar publicação", "Baixar vídeo")
+    w.link("Conferir início", "Baixar vídeo")
 
     w.node("Enviar vídeo (PUT)", "n8n-nodes-base.httpRequest", 4.2, http(
         "PUT", "={{ $('Iniciar publicação').first().json.data.upload_url }}", None,

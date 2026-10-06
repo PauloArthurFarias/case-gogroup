@@ -1,76 +1,98 @@
-# Configurando o app no TikTok for Developers
+# Publicar de verdade no TikTok (sandbox, gratuito)
 
-Passo a passo para publicar de verdade (sair do modo simulador). Leva cerca de 20 minutos, mais o tempo
-de análise do TikTok, que pode levar dias. Por isso este é o **primeiro passo** do cronograma.
+Este é o passo a passo usado para o primeiro post real, feito em 06/10/2026 (`PUBLISH_COMPLETE`,
+`publish_id v_pub_file~v2-1.7693659920302147605`). São cerca de 30 minutos de configuração, uma vez só.
 
-## 1. Criar o app
+> **O que esperar:** enquanto o app não passar pela auditoria do TikTok, ele só publica em **conta privada**,
+> e os vídeos ficam visíveis apenas para o dono. É a regra oficial para apps em sandbox, e é o que o case
+> pede ("crie usuários de teste").
 
-1. Acesse <https://developers.tiktok.com/> e entre com uma conta TikTok. Use uma **conta de teste**
-   criada para o case, não uma pessoal.
-2. **Manage apps → Connect an app.** Tipo: *Web*. Preencha nome, ícone, categoria, descrição, URLs de
-   termos de uso e política de privacidade. Podem ser páginas simples hospedadas no GitHub Pages.
-3. Em **Products**, adicione:
-   - **Login Kit**
-   - **Content Posting API**: habilite **Direct Post**.
-4. Em **Scopes**, marque `user.info.basic` e `video.publish`.
-5. Em **Login Kit → Redirect URI**, cadastre a URL HTTPS do túnel (passo 3), por exemplo
-   `https://SEU-TUNEL.trycloudflare.com/webhook/tiktok/callback`.
+## 1. Conta de teste
+Crie no app do TikTok uma conta nova só para o projeto e deixe-a **privada**: Perfil → ☰ →
+**Configurações e privacidade → Privacidade → Conta privada**.
 
-## 2. Sandbox e usuário de teste
+Sem isso, a API recusa a publicação com `unaudited_client_can_only_post_to_private_accounts`. O fluxo mostra
+essa mensagem com a instrução de correção.
 
-1. No topo do app, troque para **Sandbox** e crie um sandbox.
-2. Em **Sandbox settings → Target users**, adicione a conta TikTok de teste.
-3. Copie **Client key** e **Client secret** do sandbox.
+## 2. Textos legais públicos
+O formulário do app exige links de Termos de Uso e Política de Privacidade. Os textos estão prontos em
+[`docs/app-tiktok/`](app-tiktok/). Publique cada um como **gist público** em <https://gist.github.com> e
+guarde os links.
 
-> **Limitação oficial:** enquanto o app não passar pela auditoria (*audit*) do TikTok, todo conteúdo
-> publicado via Direct Post fica **privado** (`SELF_ONLY`), visível só para o dono da conta. É o
-> comportamento esperado para a demo. Para posts públicos, é preciso submeter o app à auditoria depois
-> de gravar o vídeo de demonstração do fluxo.
+## 3. Criar o app e configurar o **Sandbox**
+Em <https://developers.tiktok.com>, vá em **Manage apps → Connect an app**. No topo da página do app, selecione
+**Sandbox** (crie um). A configuração de Production fica em branco: só é usada para auditoria.
 
-## 3. Túnel HTTPS para o n8n local
+No Sandbox, preencha e salve:
 
-O TikTok só aceita *redirect URI* HTTPS. Com o n8n rodando em `localhost:5678`:
+| Seção | Valor |
+|---|---|
+| App icon | [`docs/app-tiktok/icone-1024.png`](app-tiktok/icone-1024.png) |
+| App name / Category / Description | "Automação na Prática - Case" / Education / descrição curta do projeto |
+| Terms of Service URL / Privacy Policy URL | links dos gists |
+| Platforms | **Web**; Website URL = link do gist dos termos |
+| Products | **Login Kit** e **Content Posting API** (com **Direct Post** ativado) |
+| Scopes | `user.info.basic` e `video.publish` |
+| Login Kit → Redirect URI (Web) | `https://<túnel>/webhook/tiktok/callback` (passo 5) |
+| Sandbox settings → Target users | a conta de teste |
+
+Copie o **Client key** (do sandbox começa com `sb`) e o **Client secret** para `desafio2-tiktok-n8n/.env`
+(modelo em `.env.example`).
+
+## 4. Bot do Telegram (aprovação humana, opcional)
+No Telegram, converse com **@BotFather**, envie `/newbot` e copie o token para `TELEGRAM_BOT_TOKEN` no
+`.env`. Depois mande `/start` para o seu bot: é assim que o script descobre o seu chat.
+
+## 5. Túnel HTTPS, só para o login
+O TikTok exige Redirect URI em HTTPS. Com o n8n rodando:
 
 ```powershell
-# baixe cloudflared.exe (https://github.com/cloudflare/cloudflared/releases) e rode:
-cloudflared tunnel --url http://localhost:5678
+$HOME\tools\cloudflared.exe tunnel --url http://localhost:5678
 ```
 
-Copie a URL `https://....trycloudflare.com` e reinicie o n8n com ela:
+Copie a URL `https://....trycloudflare.com` e:
+1. cadastre `https://....trycloudflare.com/webhook/tiktok/callback` como Redirect URI no Sandbox (passo 3);
+2. no `.env`, preencha `TIKTOK_REDIRECT_URI` com a mesma URL e `TIKTOK_MODO=real`;
+3. para os botões do Telegram funcionarem no celular, reinicie o n8n com
+   `$env:N8N_WEBHOOK_URL = "https://....trycloudflare.com/"` antes de `.\iniciar.ps1`.
 
+Depois do login, o túnel só é necessário para a aprovação pelo celular. A publicação é feita do n8n para o
+TikTok, sem túnel. O token de acesso dura 24 h e se renova sozinho pelo refresh token, que vale 365 dias.
+
+## 6. Aplicar a configuração
 ```powershell
-$env:N8N_WEBHOOK_URL = "https://....trycloudflare.com/"
-.\iniciar.ps1
+cd desafio2-tiktok-n8n
+python scripts\configurar.py
 ```
+O script:
+- cria no n8n as credenciais **OpenRouter** e **Telegram**;
+- encontra o seu chat do Telegram;
+- grava `workflows/src/local.json`, que fica fora do git;
+- gera, importa e ativa os workflows com essa configuração.
 
-O túnel rápido do cloudflared muda de URL a cada execução. Atualize a *Redirect URI* no TikTok quando
-ela mudar, ou use um túnel nomeado ou um ngrok com domínio fixo.
+Nenhum segredo é impresso.
 
-## 4. Conectar a conta (OAuth)
+## 7. Conectar a conta e publicar
+1. No navegador, entre no tiktok.com com a conta de teste e abra `https://<túnel>/webhook/tiktok/login`.
+   Clique em **Autorizar**: aparece "Conta TikTok conectada".
+2. Publique pelo botão do n8n, pelo formulário ou pelo Claude (MCP). Com a aprovação ligada, a prévia chega no
+   Telegram. Toque em **Publicar**.
+3. O vídeo aparece no perfil da conta de teste, com cadeado (privado). O log em
+   `http://127.0.0.1:8765/log` registra `modo: api-real` e o `publish_id`.
 
-1. No n8n, abra o nó **Config** do workflow `TikTok · OAuth` e preencha `client_key`,
-   `client_secret` e `redirect_uri`. Ative o workflow.
-2. Abra no navegador a URL de autorização. O workflow a mostra em `GET /webhook/tiktok/login`:
-   `https://SEU-TUNEL/webhook/tiktok/login`.
-3. Autorize com a conta de teste. O callback troca o `code` pelo `access_token`/`refresh_token` e os
-   guarda no serviço de mídia (`tokens.json`, fora do git).
-4. O `access_token` dura 24 h. O subworkflow `TikTok · Token válido` renova sozinho usando o
-   `refresh_token`, que dura 365 dias.
+## Erros comuns
 
-## 5. Virar a chave do simulador para a API real
-
-No nó **Config** do workflow principal:
-
-| Campo | Simulador | Real |
+| Mensagem | Causa | Solução |
 |---|---|---|
-| `tiktok_api` | `http://127.0.0.1:8765/mock-tiktok` | `https://open.tiktokapis.com` |
-
-Nada mais muda: o simulador implementa os mesmos endpoints e contratos
-(`creator_info/query`, `video/init`, `PUT upload_url` com `Content-Range`, `status/fetch`).
+| `unaudited_client_can_only_post_to_private_accounts` | Conta de teste pública | Deixar a conta privada (passo 1) |
+| Tela do TikTok com erro de `redirect_uri` | URL cadastrada diferente da usada | Copiar exatamente a URL do túnel + `/webhook/tiktok/callback` |
+| Erro de `client_key` | Chave de Production no lugar da do Sandbox | Usar as chaves do Sandbox |
+| Conta não pode autorizar o app | Target user ainda não ativo | Aguardar até 1 h após adicionar |
+| "Conta TikTok não conectada" | Tokens ausentes ou revogados | Refazer o login (passo 7.1) |
+| Botões do Telegram abrem `localhost` no celular | n8n sem `N8N_WEBHOOK_URL` público | Reiniciar o n8n com a URL do túnel (passo 5.3) |
 
 ## Referências
-
 - Content Posting API (Direct Post): <https://developers.tiktok.com/doc/content-posting-api-reference-direct-post>
 - Upload de mídia: <https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide>
-- OAuth v2: <https://developers.tiktok.com/doc/oauth-user-access-token-management>
-- Diretrizes de UX exigidas na auditoria: <https://developers.tiktok.com/doc/content-sharing-guidelines>
+- Sandbox: <https://developers.tiktok.com/doc/add-a-sandbox>
+- Login Kit (Web): <https://developers.tiktok.com/doc/login-kit-web>

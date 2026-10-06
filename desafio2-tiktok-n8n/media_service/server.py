@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 import sys
 import threading
@@ -160,13 +161,18 @@ class Handler(BaseHTTPRequestHandler):
         corpo = self._body_json()
         if rota == "/v2/post/publish/creator_info/query/":
             return self._mock_ok({"creator_nickname": "conta_de_teste", "creator_username": "conta.teste",
-                                  "privacy_level_options": ["SELF_ONLY"], "comment_disabled": False,
+                                  "privacy_level_options": ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"],
+                                  "comment_disabled": False,
                                   "duet_disabled": False, "stitch_disabled": True,
                                   "max_video_post_duration_sec": 600})
         if rota == "/v2/post/publish/video/init/":
             src = corpo.get("source_info", {})
             if src.get("source") != "FILE_UPLOAD" or src.get("total_chunk_count") != 1:
                 return self._json(400, {"error": {"code": "invalid_params", "message": "source_info inválido"}})
+            # Regra real do TikTok para apps sem auditoria: a CONTA precisa ser privada e o post SELF_ONLY.
+            if os.getenv("MOCK_CONTA_PRIVADA", "1") == "0":
+                return self._json(403, {"error": {"code": "unaudited_client_can_only_post_to_private_accounts",
+                                                  "message": "conta pública: deixe a conta privada"}})
             if corpo.get("post_info", {}).get("privacy_level") not in ("SELF_ONLY",):
                 return self._json(403, {"error": {"code": "unaudited_client_can_only_post_to_private_accounts",
                                                   "message": "app não auditado: use SELF_ONLY"}})

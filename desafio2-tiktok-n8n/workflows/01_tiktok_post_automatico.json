@@ -619,7 +619,13 @@
       "parameters": {
         "method": "POST",
         "url": "={{ $('Token TikTok válido').first().json.api_base }}/v2/post/publish/video/init/",
-        "options": {},
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -638,6 +644,19 @@
         "jsonBody": "={{ JSON.stringify($json.corpo) }}"
       },
       "notes": "Direct Post, FILE_UPLOAD em 1 chunk (vídeo < 64 MB). is_aigc=true: conteúdo gerado por IA."
+    },
+    {
+      "id": "ab9eef3d-09f4-564e-9b66-927bca3a7d8b",
+      "name": "Conferir início",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3310,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const e = $json.error || {};\nif (e.code === 'ok' && $json.data?.upload_url) return [$input.first()];\nconst dicas = {\n  unaudited_client_can_only_post_to_private_accounts: 'App sem auditoria só publica em CONTA PRIVADA: no TikTok, Configurações e privacidade > Privacidade > Conta privada.',\n  access_token_invalid: 'Token inválido ou revogado: refaça o login em /webhook/tiktok/login.',\n  scope_not_authorized: 'Falta a permissão video.publish: adicione o escopo no app e refaça o login.',\n  spam_risk_too_many_posts: 'Limite diário de posts do TikTok atingido: tente amanhã.',\n  rate_limit_exceeded: 'Limite de chamadas da API (6/min): aguarde um minuto.',\n  privacy_level_option_mismatch: 'Privacidade escolhida não está entre as opções da conta.',\n};\nthrow new Error('TikTok recusou a publicação (' + (e.code || 'sem código') + '). ' + (dicas[e.code] || e.message || ''));\n"
+      }
     },
     {
       "id": "48978c8f-1eb0-54ad-b49c-8bb63fea391e",
@@ -1214,6 +1233,17 @@
       ]
     },
     "Iniciar publicação": {
+      "main": [
+        [
+          {
+            "node": "Conferir início",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir início": {
       "main": [
         [
           {
