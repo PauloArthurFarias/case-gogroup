@@ -21,8 +21,11 @@ from ap_agent.pipeline import processar_pasta  # noqa: E402
 def sem_credenciais_reais(monkeypatch):
     """Os testes nunca usam o .env do desenvolvedor: nada de chamadas reais a IA ou e-mail."""
     for nome, valor in {"LLM_PROVEDOR": "anthropic", "ANTHROPIC_API_KEY": "", "LLM_API_KEY": "",
-                        "LLM_MODELO": "", "EMAIL_USUARIO": "", "EMAIL_SENHA": ""}.items():
+                        "LLM_MODELO": "", "LLM_RESERVA_API_KEY": "", "EMAIL_USUARIO": "",
+                        "EMAIL_SENHA": ""}.items():
         monkeypatch.setattr(config, nome, valor)
+    from ap_agent import llm
+    monkeypatch.setattr(llm, "_cadeia_do_processo", None)  # cada teste monta a própria cadeia
 
 
 @pytest.fixture
@@ -304,6 +307,7 @@ def test_provedor_openai_loop_do_agente(ambiente, monkeypatch):
 
     _, inbox = ambiente
     monkeypatch.setattr(config, "LLM_PROVEDOR", "openai_compat")
+    monkeypatch.setattr(config, "LLM_API_KEY", "teste")
     monkeypatch.setattr(config, "LLM_MODELO", "qwen-teste")
 
     def chamada(id_, nome, args):
@@ -323,3 +327,47 @@ def test_provedor_openai_loop_do_agente(ambiente, monkeypatch):
         d = agente.decidir(doc, validar_documento(doc, con, "h"), con, usar_llm=True)
     assert d.status == Status.REVISAO and d.decidido_por == "agente:qwen-teste"
     assert "Pedir NF complementar" in d.justificativa
+
+
+def test_cadeia_de_provedores_usa_a_reserva_quando_o_principal_falha(ambiente, monkeypatch):
+    from openai.types.chat import ChatCompletionMessage
+
+    from ap_agent import llm
+    from ap_agent.extract.pdf_documento import extrair_pdf
+
+    _, inbox = ambiente
+    monkeypatch.setattr(config, "LLM_PROVEDOR", "openai_compat")
+    monkeypatch.setattr(config, "LLM_API_KEY", "principal")
+    monkeypatch.setattr(config, "LLM_MODELO", "modelo-principal")
+    monkeypatch.setattr(config, "LLM_RESERVA_API_KEY", "reserva")
+    monkeypatch.setattr(config, "LLM_RESERVA_MODELOS", ["modelo-reserva"])
+    ok = ChatCompletionMessage(role="assistant", content='{"tipo": "DANFE_PDF", "cnpj_emitente": "08333777000180", '
+                               '"nome_emitente": "TransLog", "itens": [], "valor_total": 2850.0, "confianca": 0.95}')
+
+    def cliente(self):
+        if self.modelo == "modelo-principal":  # simula cota esgotada (429) em todas as tentativas
+            return _cliente_openai_falso([RuntimeError("429 free-models-per-day")] * 2)
+        return _cliente_openai_falso([ok])
+
+    monkeypatch.setattr(llm.ProvedorOpenAICompat, "_cliente", cliente)
+    doc = extrair_pdf(inbox / "danfe_008_frete_somente_pdf.pdf")
+    assert doc.metodo_extracao == "llm:modelo-reserva" and doc.valor_total == 2850.0
+
+
+def test_disjuntor_pula_modelo_com_cota_esgotada(monkeypatch):
+    from ap_agent import llm
+
+    chamadas = []
+
+    class Falso(llm.ProvedorOpenAICompat):
+        def extrair_pdf(self, caminho):
+            chamadas.append(self.modelo)
+            if self.modelo == "a":
+                self.esgotado = True
+                raise RuntimeError("cota diária gratuita esgotada (429)")
+            return "ok", f"llm:{self.modelo}"
+
+    cadeia = llm.ProvedorEmCadeia([Falso("u", "k", "a"), Falso("u", "k", "b")])
+    assert cadeia.extrair_pdf(None)[1] == "llm:b"
+    assert cadeia.extrair_pdf(None)[1] == "llm:b"
+    assert chamadas == ["a", "b", "b"]  # o modelo esgotado não é chamado de novo

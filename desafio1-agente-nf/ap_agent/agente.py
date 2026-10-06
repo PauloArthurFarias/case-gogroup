@@ -105,7 +105,7 @@ def _executar_ferramenta(nome: str, args: dict, con: sqlite3.Connection) -> str:
 def decidir_com_agente(doc: DocumentoFiscal, verificacoes: list[Verificacao],
                        con: sqlite3.Connection, max_turnos: int = 6) -> Decisao | None:
     """Roda o loop agêntico no provedor configurado. Devolve None se a IA falhar (o chamador usa as regras)."""
-    from .llm import provedor
+    from .llm import provedor_do_processo as provedor
 
     caso = {
         "documento": doc.model_dump(mode="json"),

@@ -199,27 +199,33 @@ para o layout da demo.
 
 ## Modelos de IA e custos
 
-A IA é configurável no `.env` (`AP_LLM_PROVEDOR`). Sem chave, tudo funciona em modo offline.
+A IA é configurável no `.env` e funciona em **cadeia**: provedor principal → reserva (vários modelos) →
+modo offline. Sem nenhuma chave, tudo funciona em modo offline (regex + regras).
 
-| Provedor | Configuração | Observações |
-|---|---|---|
-| **Claude** (padrão) | `ANTHROPIC_API_KEY` | Lê PDF nativamente; extração com `claude-haiku-4-5` ($1 / $5 por MTok), reextração e agente com `claude-sonnet-5-5` ($2 / $10) |
-| **OpenRouter** (modelos gratuitos, ex.: Qwen) | `AP_LLM_PROVEDOR=openai_compat`, `AP_LLM_BASE_URL`, `AP_LLM_API_KEY`, `AP_LLM_MODELO` | Grátis com limite diário. Modelos de texto: o PDF é convertido em texto antes (não lê PDF escaneado). Use só com dados fictícios ou seus |
-| **Ollama** (local) | `AP_LLM_BASE_URL=http://localhost:11434/v1`, `AP_LLM_API_KEY=ollama` | Privado e sem custo, mas pesado para a máquina |
+| Papel | Provedor | Configuração | Observações |
+|---|---|---|---|
+| Principal (padrão do código) | **Claude** | `ANTHROPIC_API_KEY` | Lê PDF nativamente (inclusive escaneado); `claude-haiku-4-5` na extração, `claude-sonnet-5-5` no agente |
+| Principal (usado na demo) | **OpenRouter**, modelo gratuito | `AP_LLM_PROVEDOR=openai_compat`, `AP_LLM_API_KEY`, `AP_LLM_MODELO` | 50 chamadas/dia sem créditos |
+| Reserva | **Gemini** gratuito (endpoint compatível com OpenAI) | `AP_LLM_RESERVA_API_KEY`, `AP_LLM_RESERVA_MODELO` (lista) | ~20 chamadas/dia **por modelo**; a lista multiplica a capacidade |
+| Alternativa local | **Ollama** | `AP_LLM_BASE_URL=http://localhost:11434/v1` | Privado, sem custo, pesado para a máquina |
 
-Para o modelo gratuito do OpenRouter, escolha em <https://openrouter.ai/models> um modelo com sufixo
-`:free` e suporte a *tools*, e coloque o id em `AP_LLM_MODELO`. Se o modelo falhar, sair do ar ou
-devolver JSON inválido, o sistema volta sozinho para regex e regras.
+Como a cadeia se comporta:
+- **Erro, sobrecarga (503) ou cota esgotada (429):** o próximo modelo é tentado.
+- **Cota esgotada:** o modelo vai para um *disjuntor* e não é mais chamado até o fim do lote, sem perder tempo
+  com chamadas que vão falhar.
+- **Todos falharam:** extração por regex e decisão pelas regras. O lote nunca para.
+- **Modelos de texto (OpenRouter, Gemini):** o PDF é convertido em texto antes; PDF escaneado vai para revisão.
 
 Estimativas de custo mensal em produção estão no [plano de implantação](docs/plano-implantacao.md#4-custos).
 
 ## Validação com modelo real (06/10/2026)
 
-Executado com `nvidia/nemotron-3-super-120b-a12b:free` via OpenRouter. Hoje não há Qwen gratuito com suporte a ferramentas no OpenRouter.
+Executado com `nvidia/nemotron-3-super-120b-a12b:free` via OpenRouter e, como reserva, com o Gemini gratuito. Hoje não há Qwen gratuito com suporte a ferramentas no OpenRouter.
 
 | Teste | Resultado |
 |---|---|
 | Demonstração completa (11 documentos) | 5 aprovados, 2 em revisão, 4 rejeitados, exatamente o esperado com IA |
+| Cadeia de reserva (OpenRouter sem cota) | Repetida com o OpenRouter esgotado: o Gemini (`gemini-3.5-flash-lite`) leu os 3 PDFs e investigou 5 das 6 exceções; resultado 5/2/4; modelos esgotados pulados pelo disjuntor |
 | DANFE em PDF (`danfe_008`) | Lida pelo modelo (CNPJ, valor, vencimento, pedido, item) e aprovada |
 | Exceções (6 documentos) | Investigadas pelo agente, que consultou ferramentas e escreveu justificativa e ação sugerida; o guard-rail manteve os 4 rejeitados |
 | E-mail real (Gmail, IMAP) | 5 mensagens não lidas lidas e marcadas; anexos XML/PDF salvos e processados; e-mails sem anexo ignorados |
@@ -231,5 +237,6 @@ Executado com `nvidia/nemotron-3-super-120b-a12b:free` via OpenRouter. Hoje não
 - **E-mail por IMAP com senha de app:** em produção corporativa (Microsoft 365), o recomendado é OAuth via Graph API.
 - **Sem consulta à SEFAZ:** a situação da NF-e (autorizada/cancelada) entra na fase de integração.
 - **Impostos:** o agente não recalcula ICMS/IPI/retenções, só confere somas.
-- **Modelos gratuitos:** têm limite diário e podem ficar indisponíveis (erro 429). Quando isso acontece, o documento é decidido pelas regras, sem interromper o lote.
+- **Modelos gratuitos:** têm limite diário (OpenRouter: 50 chamadas; Gemini: cerca de 20 por modelo) e
+  picos de sobrecarga (503). A cadeia de reservas reduz o impacto; se todos falharem, as regras decidem.
 - **NFS-e (nota de serviço):** não é suportada. O XML é recusado com mensagem explícita e registrado na auditoria (`EXTRACAO_FALHOU`).

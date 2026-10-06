@@ -93,7 +93,7 @@ def _extrair_por_regex(caminho: Path) -> ExtracaoLLM:
 def extrair_pdf(caminho: Path) -> DocumentoFiscal:
     bruto, metodo = None, "regex-offline"
     if config.llm_disponivel():
-        from ..llm import provedor
+        from ..llm import provedor_do_processo as provedor
         try:
             bruto, metodo = provedor().extrair_pdf(caminho)
         except Exception as e:  # IA indisponível ou resposta inválida: cai no modo offline

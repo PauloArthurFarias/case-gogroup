@@ -112,13 +112,15 @@ A tabela `auditoria` é só de inserção: toda decisão (regra, agente ou human
 
 ## 5. Uso da IA (`llm.py`)
 
-A IA é intercambiável. `llm.provedor()` devolve o provedor configurado em `AP_LLM_PROVEDOR`, e o resto do
-sistema não sabe qual modelo está do outro lado. Qualquer falha devolve o controle ao modo offline:
+A IA é intercambiável. `llm.provedor_do_processo()` devolve o provedor configurado, e o resto do sistema não
+sabe qual modelo está do outro lado. Com uma chave de reserva, ele devolve uma `ProvedorEmCadeia`: principal
+primeiro, depois cada modelo da reserva, com um disjuntor que pula até o fim do lote os modelos com cota
+esgotada. Qualquer falha devolve o controle ao modo offline:
 regex na extração e regras na decisão. O processo nunca para por causa da IA.
 
 | | Claude (`anthropic`) | API compatível com OpenAI (`openai_compat`) |
 |---|---|---|
-| Exemplos | Haiku 4.5 (extração), Sonnet 5.5 (reextração e agente) | OpenRouter (validado com `nvidia/nemotron-3-super-120b-a12b:free`), Ollama local |
+| Exemplos | Haiku 4.5 (extração), Sonnet 5.5 (reextração e agente) | OpenRouter (validado com `nvidia/nemotron-3-super-120b-a12b:free`), Gemini (validado com `gemini-3.5-flash` e `-lite`), Ollama local |
 | Entrada do PDF | Bloco `document` (base64), lê inclusive escaneado | Texto extraído com `pypdf` (não lê PDF escaneado) |
 | Formato da resposta | Structured outputs (`client.messages.parse` + schema Pydantic `ExtracaoLLM`) | `response_format` JSON Schema; se recusado, `json_object`; validação Pydantic |
 | Confiança baixa (< 0,85) | Reextrai com o modelo maior | Vai para revisão |

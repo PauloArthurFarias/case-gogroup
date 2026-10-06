@@ -21,6 +21,14 @@ MODELO_AGENTE = os.getenv("AP_MODELO_AGENTE", "claude-sonnet-5-5")
 LLM_BASE_URL = os.getenv("AP_LLM_BASE_URL", "https://openrouter.ai/api/v1").strip()
 LLM_API_KEY = os.getenv("AP_LLM_API_KEY", "").strip()
 LLM_MODELO = os.getenv("AP_LLM_MODELO", "").strip()
+# Reserva (opcional): outro endpoint compatível com OpenAI, usado quando o principal falha ou estoura a cota.
+LLM_RESERVA_BASE_URL = os.getenv("AP_LLM_RESERVA_BASE_URL",
+                                 "https://generativelanguage.googleapis.com/v1beta/openai/").strip()
+LLM_RESERVA_API_KEY = os.getenv("AP_LLM_RESERVA_API_KEY", "").strip()
+# Lista separada por vírgula: no Gemini gratuito cada modelo tem a própria cota diária (ex.: 20 chamadas).
+LLM_RESERVA_MODELOS = [m.strip() for m in os.getenv(
+    "AP_LLM_RESERVA_MODELO", "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.7-flash").split(",") if m.strip()]
+LLM_RESERVA_MODELO = LLM_RESERVA_MODELOS[0] if LLM_RESERVA_MODELOS else ""
 
 CNPJ_EMPRESA = os.getenv("AP_CNPJ_EMPRESA", "11222333000181")
 TOLERANCIA_PRECO = float(os.getenv("AP_TOLERANCIA_PRECO", "2.0"))
@@ -37,6 +45,8 @@ EMAIL_PASTA = os.getenv("AP_EMAIL_PASTA", "INBOX").strip()
 
 
 def llm_disponivel() -> bool:
+    if LLM_RESERVA_API_KEY:
+        return True
     if LLM_PROVEDOR == "openai_compat":
         return bool(LLM_API_KEY and LLM_MODELO)
     return bool(ANTHROPIC_API_KEY)
@@ -45,9 +55,14 @@ def llm_disponivel() -> bool:
 def descricao_llm() -> str:
     if not llm_disponivel():
         return "offline (regras + regex)"
-    if LLM_PROVEDOR == "openai_compat":
-        return f"{LLM_MODELO} via {LLM_BASE_URL}"
-    return f"Claude API ({MODELO_EXTRACAO} / {MODELO_AGENTE})"
+    if LLM_PROVEDOR == "openai_compat" and LLM_API_KEY:
+        principal = f"{LLM_MODELO} via {LLM_BASE_URL}"
+    elif ANTHROPIC_API_KEY:
+        principal = f"Claude API ({MODELO_EXTRACAO} / {MODELO_AGENTE})"
+    else:
+        principal = ""
+    reserva = f"reserva: {', '.join(LLM_RESERVA_MODELOS)}" if LLM_RESERVA_API_KEY else ""
+    return " -> ".join(x for x in (principal, reserva) if x)
 
 
 def email_configurado() -> bool:

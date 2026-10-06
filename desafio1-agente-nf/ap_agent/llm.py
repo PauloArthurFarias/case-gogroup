@@ -39,6 +39,22 @@ def _texto_pdf(caminho: Path) -> str:
     return "\n".join(p.extract_text() or "" for p in PdfReader(str(caminho)).pages)
 
 
+def _cota_esgotada(e: Exception) -> bool:
+    """429/RESOURCE_EXHAUSTED: cota do plano gratuito acabou; não adianta tentar de novo neste lote."""
+    t = str(e)
+    return "429" in t or "RESOURCE_EXHAUSTED" in t or "quota" in t.lower()
+
+
+def _resumo_erro(e: Exception) -> str:
+    t = str(e)
+    for chave in ("free-models-per-day", "RESOURCE_EXHAUSTED", "high demand", "UNAVAILABLE"):
+        if chave in t:
+            return {"free-models-per-day": "cota diária gratuita esgotada (429)",
+                    "RESOURCE_EXHAUSTED": "cota diária gratuita esgotada (429)",
+                    "high demand": "modelo sobrecarregado (503)", "UNAVAILABLE": "modelo indisponível (503)"}[chave]
+    return t[:160]
+
+
 def _json_de(texto: str) -> str:
     """Remove cercas ```json ... ``` que alguns modelos acrescentam."""
     m = re.search(r"\{.*\}", texto or "", re.S)
@@ -110,12 +126,18 @@ class ProvedorAnthropic:
 
 # ------------------------------------------------------- OpenAI-compatível
 class ProvedorOpenAICompat:
-    """OpenRouter, Ollama ou qualquer endpoint /v1/chat/completions."""
+    """OpenRouter, Gemini (endpoint compatível), Ollama ou qualquer endpoint /v1/chat/completions."""
     nome = "openai_compat"
+
+    def __init__(self, base_url: str | None = None, api_key: str | None = None, modelo: str | None = None):
+        self.base_url = base_url or config.LLM_BASE_URL
+        self.api_key = api_key or config.LLM_API_KEY
+        self.modelo = modelo or config.LLM_MODELO
+        self.esgotado = False  # disjuntor: cota acabou, pular até o fim do processo
 
     def _cliente(self):
         from openai import OpenAI
-        return OpenAI(base_url=config.LLM_BASE_URL, api_key=config.LLM_API_KEY, timeout=120, max_retries=2)
+        return OpenAI(base_url=self.base_url, api_key=self.api_key, timeout=120, max_retries=2)
 
     def extrair_pdf(self, caminho: Path) -> tuple[ExtracaoLLM, str]:
         texto = _texto_pdf(caminho)
@@ -133,14 +155,17 @@ class ProvedorOpenAICompat:
         ultimo_erro: Exception | None = None
         for formato in formatos:  # nem todo modelo gratuito aceita json_schema; tenta o mais simples depois
             try:
-                resp = client.chat.completions.create(model=config.LLM_MODELO, messages=mensagens,
+                resp = client.chat.completions.create(model=self.modelo, messages=mensagens,
                                                       response_format=formato, temperature=0)
                 conteudo = resp.choices[0].message.content
-                return ExtracaoLLM.model_validate_json(_json_de(conteudo)), f"llm:{config.LLM_MODELO}"
-            except Exception as e:  # formato não suportado ou JSON inválido
-                log.info("Extração com %s falhou (%s)", formato["type"], e)
+                return ExtracaoLLM.model_validate_json(_json_de(conteudo)), f"llm:{self.modelo}"
+            except Exception as e:  # formato não suportado, JSON inválido, cota, 503...
+                if _cota_esgotada(e):
+                    self.esgotado = True
+                    raise RuntimeError(_resumo_erro(e)) from e
+                log.info("Extração com %s falhou (%s)", formato["type"], _resumo_erro(e))
                 ultimo_erro = e
-        raise RuntimeError(f"modelo não devolveu JSON válido: {ultimo_erro}")
+        raise RuntimeError(_resumo_erro(ultimo_erro) if ultimo_erro else "sem resposta")
 
     def rodar_agente(self, system: str, tools: list[dict], pedido: str, executar: ExecutarFerramenta,
                      max_turnos: int = 6) -> dict | None:
@@ -152,7 +177,7 @@ class ProvedorOpenAICompat:
         messages: list = [{"role": "system", "content": system}, {"role": "user", "content": pedido}]
         try:
             for _ in range(max_turnos):
-                resp = client.chat.completions.create(model=config.LLM_MODELO, messages=messages,
+                resp = client.chat.completions.create(model=self.modelo, messages=messages,
                                                       tools=ferramentas, tool_choice="auto", temperature=0)
                 msg = resp.choices[0].message
                 messages.append(msg.model_dump(exclude_none=True))
@@ -169,17 +194,69 @@ class ProvedorOpenAICompat:
                         continue
                     if nome == "registrar_decisao":
                         if args.get("status") in ("APROVADO", "REVISAO", "REJEITADO") and args.get("justificativa"):
-                            return {**args, "modelo": config.LLM_MODELO}
+                            return {**args, "modelo": self.modelo}
                         messages.append({"role": "tool", "tool_call_id": chamada.id,
                                          "content": json.dumps({"erro": "status inválido ou sem justificativa"})})
                         continue
                     messages.append({"role": "tool", "tool_call_id": chamada.id, "content": executar(nome, args)})
         except OpenAIError as e:
-            log.warning("Modelo %s indisponível (%s)", config.LLM_MODELO, e)
+            self.esgotado = self.esgotado or _cota_esgotada(e)
+            log.warning("Modelo %s indisponível: %s", self.modelo, _resumo_erro(e))
             return None
         log.warning("Agente não concluiu em %d turnos", max_turnos)
         return None
 
 
-def provedor() -> ProvedorAnthropic | ProvedorOpenAICompat:
-    return ProvedorOpenAICompat() if config.LLM_PROVEDOR == "openai_compat" else ProvedorAnthropic()
+class ProvedorEmCadeia:
+    """Tenta cada provedor em ordem: o primeiro que responder vence (ex.: OpenRouter, depois Gemini)."""
+    nome = "cadeia"
+
+    def __init__(self, provedores: list):
+        self.provedores = provedores
+
+    def extrair_pdf(self, caminho: Path) -> tuple[ExtracaoLLM, str]:
+        ultimo: Exception | None = None
+        for p in self.ativos():
+            try:
+                return p.extrair_pdf(caminho)
+            except Exception as e:  # cota esgotada, 503, JSON inválido...: tenta o próximo
+                log.warning("IA %s falhou na extração: %s", getattr(p, "modelo", p.nome), e)
+                ultimo = e
+        raise RuntimeError(f"nenhum provedor de IA respondeu ({ultimo or 'todos com cota esgotada'})")
+
+    def rodar_agente(self, *args, **kwargs) -> dict | None:
+        for p in self.ativos():
+            r = p.rodar_agente(*args, **kwargs)
+            if r:
+                return r
+        return None
+
+    def ativos(self) -> list:
+        return [p for p in self.provedores if not getattr(p, "esgotado", False)]
+
+
+def provedor():
+    """Provedor configurado; com AP_LLM_RESERVA_API_KEY, vira uma cadeia principal -> reserva."""
+    cadeia = []
+    if config.LLM_PROVEDOR == "openai_compat":
+        if config.LLM_API_KEY and config.LLM_MODELO:
+            cadeia.append(ProvedorOpenAICompat())
+    elif config.ANTHROPIC_API_KEY:
+        cadeia.append(ProvedorAnthropic())
+    if config.LLM_RESERVA_API_KEY:  # um provedor por modelo: no Gemini gratuito, cada modelo tem cota própria
+        for modelo in config.LLM_RESERVA_MODELOS:
+            cadeia.append(ProvedorOpenAICompat(config.LLM_RESERVA_BASE_URL, config.LLM_RESERVA_API_KEY, modelo))
+    if len(cadeia) == 1:
+        return cadeia[0]
+    return ProvedorEmCadeia(cadeia or [ProvedorAnthropic()])
+
+
+_cadeia_do_processo = None
+
+
+def provedor_do_processo():
+    """Mesma cadeia durante o processo inteiro, para o disjuntor de cota valer no lote todo."""
+    global _cadeia_do_processo
+    if _cadeia_do_processo is None:
+        _cadeia_do_processo = provedor()
+    return _cadeia_do_processo
