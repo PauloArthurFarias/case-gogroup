@@ -128,6 +128,7 @@ def workflow_principal() -> None:
         ("usar_ia", True, "boolean"),
         ("provedor_ia", LOCAL.get("provedor_ia", "openrouter"), "string"),
         ("modelo_openrouter", LOCAL.get("modelo_openrouter", "nvidia/nemotron-3-super-120b-a12b:free"), "string"),
+        ("modelo_gemini", LOCAL.get("modelo_gemini", "gemini-2.5-flash"), "string"),
         ("modelo", "claude-opus-5-5", "string"),
         ("media_api", MEDIA, "string"),
         ("privacidade_preferida", "SELF_ONLY", "string"),
@@ -147,14 +148,19 @@ def workflow_principal() -> None:
 
     schema_roteiro = {
         "type": "object", "additionalProperties": False,
-        "required": ["tema", "gancho", "cenas", "cta", "hashtags"],
+        "required": ["tema", "gancho", "emoji_gancho", "imagem_gancho", "cenas", "cta", "hashtags"],
         "properties": {
             "tema": {"type": "string"},
             "gancho": {"type": "string", "description": "Frase de até 12 palavras para prender nos 2 primeiros segundos"},
+            "emoji_gancho": {"type": "string", "description": "1 emoji"},
+            "imagem_gancho": {"type": "string", "description": "2 a 4 palavras-chave em inglês para a foto de fundo"},
             "cenas": {"type": "array", "items": {
-                "type": "object", "additionalProperties": False, "required": ["texto", "narracao"],
+                "type": "object", "additionalProperties": False, "required": ["texto", "narracao", "emoji", "imagem"],
                 "properties": {"texto": {"type": "string", "description": "Texto na tela, até 8 palavras"},
-                               "narracao": {"type": "string", "description": "Fala da cena, 1 a 2 frases"}}}},
+                               "narracao": {"type": "string", "description": "Fala da cena, 1 a 2 frases"},
+                               "emoji": {"type": "string", "description": "1 emoji"},
+                               "imagem": {"type": "string",
+                                          "description": "2 a 4 palavras-chave em inglês para a foto de fundo"}}}},
             "cta": {"type": "string"},
             "hashtags": {"type": "array", "items": {"type": "string"}},
         }}
@@ -192,6 +198,44 @@ def workflow_principal() -> None:
         (1060, 200), onError="continueErrorOutput")
     w.link("OpenRouter: gerar roteiro", "Ler resposta (OpenRouter)", 0)
 
+    # Reserva: Gemini (API gratuita do Google, endpoint compatível com OpenAI). Entra quando o OpenRouter
+    # falha ou estoura a cota diária; se o Gemini também falhar, o banco de roteiros assume.
+    corpo_gemini = (
+        "={{ JSON.stringify({\n"
+        "  model: $('Config').first().json.modelo_gemini,\n"
+        "  temperature: 0.8,\n"
+        "  response_format: { type: 'json_object' },\n"
+        "  messages: [\n"
+        "    { role: 'system', content: " + json.dumps(
+            prompt + "\n\nResponda SOMENTE com um JSON neste formato (sem texto fora do JSON):\n"
+            + json.dumps({"tema": "...", "gancho": "...", "emoji_gancho": "🚨", "imagem_gancho": "english keywords",
+                          "cenas": [{"texto": "...", "narracao": "...", "emoji": "💡",
+                                     "imagem": "english keywords"}],
+                          "cta": "...", "hashtags": ["..."]}, ensure_ascii=False),
+            ensure_ascii=False) + " },\n"
+        "    { role: 'user', content: 'Tema: ' + ($('Config').first().json.tema || "
+        "'escolha um tema útil de automação para empresas') }\n"
+        "  ]\n"
+        "}) }}"
+    )
+    w.node("Gemini: gerar roteiro (reserva)", "n8n-nodes-base.httpRequest", 4.2, http(
+        "POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", corpo_gemini,
+        authentication="genericCredentialType", genericAuthType="httpHeaderAuth",
+        options={"timeout": 120000}),
+        (1060, 560), onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000,
+        notes="Provedor reserva gratuito (Google AI Studio, credencial Header Auth 'Gemini').",
+        **cred("httpHeaderAuth", "gemini_cred_id", "Gemini"))
+    w.node("Ler resposta (Gemini)", "n8n-nodes-base.code", 2, {"jsCode": (
+        "const r = $json;\n"
+        "if (r.error) throw new Error('Gemini: ' + JSON.stringify(r.error));\n"
+        "const texto = r.choices?.[0]?.message?.content || '';\n"
+        "const m = texto.match(/\\{[\\s\\S]*\\}/);\n"
+        "if (!m) throw new Error('Resposta sem JSON');\n"
+        "return [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + $('Config').first().json.modelo_gemini,\n"
+        "  tokens: r.usage?.total_tokens || 0 } }];\n")},
+        (1280, 560), onError="continueErrorOutput")
+    w.link("Gemini: gerar roteiro (reserva)", "Ler resposta (Gemini)", 0)
+
     corpo_claude = (
         "={{ JSON.stringify({\n"
         "  model: $json.modelo,\n"
@@ -223,27 +267,38 @@ def workflow_principal() -> None:
         (1060, 20), onError="continueErrorOutput")
     w.link("Claude: gerar roteiro", "Ler resposta da IA", 0)
 
-    w.node("Banco de roteiros", "n8n-nodes-base.code", 2, {"jsCode": banco}, (1060, 400),
+    w.node("Banco de roteiros", "n8n-nodes-base.code", 2, {"jsCode": banco}, (1060, 760),
            notes="Fallback sem custo: usado com usar_ia=false ou quando a IA falha.")
     w.link("Usar IA?", "Banco de roteiros", 1)
     w.link("Claude: gerar roteiro", "Banco de roteiros", 1)
     w.link("Ler resposta da IA", "Banco de roteiros", 1)
-    w.link("OpenRouter: gerar roteiro", "Banco de roteiros", 1)
-    w.link("Ler resposta (OpenRouter)", "Banco de roteiros", 1)
+    w.link("OpenRouter: gerar roteiro", "Gemini: gerar roteiro (reserva)", 1)
+    w.link("Ler resposta (OpenRouter)", "Gemini: gerar roteiro (reserva)", 1)
+    w.link("Gemini: gerar roteiro (reserva)", "Banco de roteiros", 1)
+    w.link("Ler resposta (Gemini)", "Banco de roteiros", 1)
 
     w.node("Normalizar roteiro", "n8n-nodes-base.code", 2, {"jsCode": (
         "const cfg = $('Config').first().json;\n"
         "const r = $json;\n"
         "const limpa = (s, n) => (s || '').toString().replace(/\\s+/g, ' ').trim().slice(0, n);\n"
-        "const cenas = (r.cenas || []).slice(0, 5).map(c => ({ texto: limpa(c.texto, 90), narracao: limpa(c.narracao || c.texto, 300) }))\n"
+        "// primeiro grafema (um emoji pode ter vários code points, ex.: 👨‍💻)\n"
+        "const emoji = (s, padrao) => {\n"
+        "  const t = (s || '').toString().trim();\n"
+        "  return t ? [...new Intl.Segmenter('pt', { granularity: 'grapheme' }).segment(t)][0].segment : padrao;\n"
+        "};\n"
+        "const cenas = (r.cenas || []).slice(0, 5).map(c => ({ texto: limpa(c.texto, 90), narracao: limpa(c.narracao || c.texto, 300),\n"
+        "  emoji: emoji(c.emoji, '💡'), imagem: limpa(c.imagem, 60) }))\n"
         "  .filter(c => c.texto);\n"
         "if (!r.gancho || cenas.length < 2) throw new Error('Roteiro inválido: precisa de gancho e ao menos 2 cenas');\n"
         "const hashtags = [...new Set((r.hashtags || []).map(h => '#' + h.replace(/^#/, '').replace(/\\s+/g, '')))].slice(0, 6);\n"
         "const titulo = (limpa(r.gancho, 150) + '\\n\\n' + hashtags.join(' ')).slice(0, 2200);\n"
-        "return [{ json: { tema: r.tema || cfg.tema, gancho: limpa(r.gancho, 100), cenas, cta: limpa(r.cta, 90),\n"
-        "  hashtags, titulo, marca: cfg.marca, origem: r.origem } }];\n")}, (1300, 240))
+        "return [{ json: { tema: r.tema || cfg.tema, gancho: limpa(r.gancho, 100), emoji_gancho: emoji(r.emoji_gancho, '🚨'),\n"
+        "  imagem_gancho: limpa(r.imagem_gancho, 60), cenas, cta: limpa(r.cta, 90), emoji_cta: '👉',\n"
+        "  imagem_cta: cenas[cenas.length - 1].imagem, hashtags, titulo, marca: cfg.marca, origem: r.origem } }];\n")},
+        (1300, 240))
     w.link("Ler resposta da IA", "Normalizar roteiro", 0)
     w.link("Ler resposta (OpenRouter)", "Normalizar roteiro", 0)
+    w.link("Ler resposta (Gemini)", "Normalizar roteiro", 0)
     w.link("Banco de roteiros", "Normalizar roteiro", 0)
 
     w.node("Renderizar vídeo", "n8n-nodes-base.httpRequest", 4.2, http(

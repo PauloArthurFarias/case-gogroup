@@ -45,6 +45,31 @@ def chat_id_telegram(token: str) -> str | None:
     return None
 
 
+def modelo_gemini_gratuito(chave: str) -> str:
+    """Escolhe o Flash estável mais recente disponível para a chave (evita preview/experimental)."""
+    try:
+        req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/openai/models",
+                                     headers={"Authorization": f"Bearer {chave}"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            ids = [m["id"].removeprefix("models/") for m in json.load(r).get("data", [])]
+        candidatos = sorted((i for i in ids if i.startswith("gemini-") and i.endswith("-flash")),
+                            key=lambda i: [int(x) if x.isdigit() else 0 for x in i.split("-")[1].split(".")],
+                            reverse=True)
+        return candidatos[0] if candidatos else "gemini-2.5-flash"
+    except Exception:
+        return "gemini-2.5-flash"
+
+
+def pexels_ok(chave: str) -> bool:
+    try:
+        req = urllib.request.Request("https://api.pexels.com/v1/search?query=office&per_page=1",
+                                     headers={"Authorization": chave})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return bool(json.load(r).get("photos"))
+    except Exception:
+        return False
+
+
 def main() -> int:
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         sys.stdout.reconfigure(encoding="utf-8")
@@ -62,6 +87,21 @@ def main() -> int:
         print("OpenRouter: credencial configurada")
     else:
         print("OpenRouter: sem chave (o roteiro virá do banco de roteiros)")
+
+    chave_gm = env.get("GEMINI_API_KEY")
+    if chave_gm:
+        local["gemini_cred_id"] = n.credencial("Gemini", "httpHeaderAuth",
+                                               {"name": "Authorization", "value": f"Bearer {chave_gm}"})
+        local["modelo_gemini"] = env.get("GEMINI_MODELO") or modelo_gemini_gratuito(chave_gm)
+        print(f"Gemini (reserva): credencial configurada, modelo {local['modelo_gemini']}")
+    else:
+        print("Gemini (reserva): sem chave")
+
+    chave_px = env.get("PEXELS_API_KEY")
+    if chave_px:
+        print("Pexels (fotos de fundo):", "chave válida" if pexels_ok(chave_px) else "CHAVE RECUSADA - confira")
+    else:
+        print("Pexels (fotos de fundo): sem chave (fundo em degradê)")
 
     token_tg = env.get("TELEGRAM_BOT_TOKEN")
     if token_tg:
