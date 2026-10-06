@@ -85,6 +85,15 @@ painel com SSO; logs estruturados com custo de tokens por documento.
 Alavancas, se o volume crescer: *prompt caching* do system prompt e das ferramentas do agente; Batch API
 (50% de desconto) para lotes noturnos; reduzir o esforço do agente para `low` em exceções simples.
 
+**Alternativas de provedor.** O código aceita qualquer API compatível com OpenAI (`AP_LLM_PROVEDOR`), então o
+custo de IA pode ser ajustado a cada fase:
+
+| Fase | Opção | Custo de IA | Observação |
+|---|---|---|---|
+| Prova de conceito / demo | Modelo gratuito no OpenRouter (validado: Nemotron 3 Super) | R$ 0 | Limite diário e indisponibilidade ocasional (erro 429); só dados fictícios, pois o plano gratuito pode usar os dados |
+| Piloto shadow e produção | Claude (tabela acima) | ≈ US$ 27/mês | Contrato de dados (LGPD), lê PDF escaneado, alta disponibilidade |
+| Alternativa com dados sensíveis | Modelo aberto local (Ollama) em servidor próprio | Só infraestrutura (servidor com memória e, idealmente, GPU; dimensionar no piloto) | Dados não saem da empresa; qualidade e velocidade menores |
+
 ### 4.2 Infraestrutura e ferramentas (recorrente)
 
 | Item | Custo/mês estimado |
