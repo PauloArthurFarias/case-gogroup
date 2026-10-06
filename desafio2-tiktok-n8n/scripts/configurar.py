@@ -70,6 +70,14 @@ def pexels_ok(chave: str) -> bool:
         return False
 
 
+def pixabay_ok(chave: str) -> bool:
+    try:
+        with urllib.request.urlopen(f"https://pixabay.com/api/?key={chave}&q=office&per_page=3", timeout=20) as r:
+            return bool(json.load(r).get("hits"))
+    except Exception:
+        return False
+
+
 def main() -> int:
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         sys.stdout.reconfigure(encoding="utf-8")
@@ -97,11 +105,13 @@ def main() -> int:
     else:
         print("Gemini (reserva): sem chave")
 
-    chave_px = env.get("PEXELS_API_KEY")
+    chave_px, chave_pb = env.get("PEXELS_API_KEY"), env.get("PIXABAY_API_KEY")
     if chave_px:
         print("Pexels (fotos de fundo):", "chave válida" if pexels_ok(chave_px) else "CHAVE RECUSADA - confira")
-    else:
-        print("Pexels (fotos de fundo): sem chave (fundo em degradê)")
+    if chave_pb:
+        print("Pixabay (fotos de fundo):", "chave válida" if pixabay_ok(chave_pb) else "CHAVE RECUSADA - confira")
+    if not (chave_px or chave_pb):
+        print("Fotos de fundo: sem chave (fundo em degradê)")
 
     token_tg = env.get("TELEGRAM_BOT_TOKEN")
     if token_tg:

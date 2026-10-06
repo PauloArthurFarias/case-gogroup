@@ -1,7 +1,7 @@
 """Renderiza um roteiro em vídeo vertical 1080x1920 (formato TikTok).
 
 Por cena:
-  - fundo: foto do Pexels (busca pelas palavras-chave da cena) ou degradê, se não houver chave/rede;
+  - fundo: foto do Pexels ou Pixabay (busca pelas palavras-chave da cena) ou degradê, sem chave/rede;
   - emoji grande escolhido pelo roteiro (fonte Segoe UI Emoji, colorida, offline);
   - texto principal num painel translúcido;
   - narração neural pt-BR (edge-tts) com o tempo de cada palavra.
@@ -42,12 +42,13 @@ CACHE = BASE / "output" / "_cache_fotos"
 
 
 # ----------------------------------------------------------------- utilidades
-def _chave_pexels() -> str:
-    chave = os.getenv("PEXELS_API_KEY", "").strip()
+def _chave(nome: str) -> str:
+    """Lê a chave do ambiente ou do .env do Desafio 2."""
+    chave = os.getenv(nome, "").strip()
     env = BASE / ".env"
     if not chave and env.exists():
         for linha in env.read_text(encoding="utf-8").splitlines():
-            if linha.strip().startswith("PEXELS_API_KEY="):
+            if linha.strip().startswith(f"{nome}="):
                 chave = linha.split("=", 1)[1].strip()
     return chave
 
@@ -85,33 +86,55 @@ def _degrade(i: int) -> Image.Image:
     return Image.composite(Image.new("RGB", (W, H), DESTAQUE), img, luz.point(lambda v: v // 3))
 
 
-def _foto_pexels(busca: str, semente: int) -> Image.Image | None:
-    """Foto vertical do Pexels (licença livre, sem atribuição obrigatória). Cache local por busca."""
-    chave = _chave_pexels()
-    if not chave or not busca:
+def _url_pexels(busca: str, semente: int, chave: str) -> str | None:
+    url = "https://api.pexels.com/v1/search?" + urllib.parse.urlencode(
+        {"query": busca, "orientation": "portrait", "per_page": 8, "size": "large"})
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": chave}), timeout=20) as r:
+        fotos = json.load(r).get("photos", [])
+    if not fotos:
+        return None
+    return fotos[semente % len(fotos)]["src"]["original"] + f"?auto=compress&cs=tinysrgb&fit=crop&w={W}&h={H}"
+
+
+def _url_pixabay(busca: str, semente: int, chave: str) -> str | None:
+    url = "https://pixabay.com/api/?" + urllib.parse.urlencode(
+        {"key": chave, "q": busca[:100], "image_type": "photo", "orientation": "vertical", "per_page": 10,
+         "safesearch": "true", "min_height": 1200})
+    with urllib.request.urlopen(url, timeout=20) as r:
+        fotos = json.load(r).get("hits", [])
+    if not fotos:
+        return None
+    return fotos[semente % len(fotos)]["largeImageURL"]
+
+
+def _foto(busca: str, semente: int) -> Image.Image | None:
+    """Foto vertical de banco de imagens com licença livre (Pexels ou Pixabay, o que tiver chave).
+    Cache local por busca; qualquer falha devolve None (o slide usa o degradê)."""
+    provedores = [(n, f, _chave(k)) for n, f, k in (("pexels", _url_pexels, "PEXELS_API_KEY"),
+                                                     ("pixabay", _url_pixabay, "PIXABAY_API_KEY"))]
+    provedores = [p for p in provedores if p[2]]
+    if not provedores or not busca:
         return None
     CACHE.mkdir(parents=True, exist_ok=True)
     nome = hashlib.sha1(f"{busca}|{semente}".encode()).hexdigest()[:16] + ".jpg"
     if (CACHE / nome).exists():
         return Image.open(CACHE / nome).convert("RGB")
-    try:
-        url = "https://api.pexels.com/v1/search?" + urllib.parse.urlencode(
-            {"query": busca, "orientation": "portrait", "per_page": 8, "size": "large"})
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": chave}), timeout=20) as r:
-            fotos = json.load(r).get("photos", [])
-        if not fotos:
-            return None
-        foto = fotos[semente % len(fotos)]
-        src = foto["src"]["original"] + f"?auto=compress&cs=tinysrgb&fit=crop&w={W}&h={H}"
-        with urllib.request.urlopen(src, timeout=30) as r:
-            (CACHE / nome).write_bytes(r.read())
-        return Image.open(CACHE / nome).convert("RGB")
-    except Exception:
-        return None
+    for _, achar_url, chave in provedores:
+        try:
+            src = achar_url(busca, semente, chave)
+            if not src:
+                continue
+            with urllib.request.urlopen(urllib.request.Request(src, headers={"User-Agent": "Mozilla/5.0"}),
+                                        timeout=30) as r:
+                (CACHE / nome).write_bytes(r.read())
+            return Image.open(CACHE / nome).convert("RGB")
+        except Exception:
+            continue
+    return None
 
 
 def _fundo(i: int, busca: str, semente: int) -> tuple[Image.Image, bool]:
-    foto = _foto_pexels(busca, semente)
+    foto = _foto(busca, semente)
     if foto is None:
         return _degrade(i), False
     foto = ImageOps.fit(foto, (W, H), Image.LANCZOS)
