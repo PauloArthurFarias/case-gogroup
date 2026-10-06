@@ -5,7 +5,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 | | Desafio 1: Agente de IA | Desafio 2: TikTok automático |
 |---|---|---|
 | **O quê** | Agente de Contas a Pagar: lê NF-e/DANFE/boletos, faz o 3-way match, barra fraude e duplicidade, entrega só as exceções ao analista | Fluxo n8n que cria roteiro com IA, monta o vídeo 9:16 com narração e publica pela API oficial do TikTok |
-| **Stack** | Python, IA (Claude ou modelo gratuito via OpenRouter), e-mail IMAP, SQLite, Streamlit, **servidor MCP** | **n8n 2.41**, IA (OpenRouter gratuito ou Claude), edge-tts, ffmpeg, TikTok Content Posting API, Telegram, **servidor MCP no n8n** |
+| **Stack** | Python, IA (Claude ou modelo gratuito via OpenRouter), e-mail IMAP, SQLite, Streamlit, **servidor MCP** | **n8n 2.41**, IA gratuita (OpenRouter → Gemini) ou Claude, edge-tts, ffmpeg, Pixabay, TikTok Content Posting API, Telegram, **servidor MCP no n8n** |
 | **Pasta** | [`desafio1-agente-nf/`](desafio1-agente-nf/) | [`desafio2-tiktok-n8n/`](desafio2-tiktok-n8n/) |
 | **Comece por** | [README](desafio1-agente-nf/README.md) · [Plano de implantação](desafio1-agente-nf/docs/plano-implantacao.md) | [README](desafio2-tiktok-n8n/README.md) · [Setup do TikTok](desafio2-tiktok-n8n/docs/setup-tiktok.md) |
 
@@ -46,7 +46,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 |---|---|---|
 | Extração de PDF e agente investigador com IA (D1) | Chave de IA no `.env` (OpenRouter gratuito ou Claude) | **Validado com modelo real** (OpenRouter): demo 5/2/4, DANFE lida pela IA, exceções investigadas |
 | Leitura de notas por e-mail (D1) | Gmail com senha de app no `.env` | **Validado com caixa real**: anexos baixados, processados e auditados |
-| Roteiro gerado por IA (D2) | Chave OpenRouter (gratuita) | Configurado; testado o fallback quando o limite diário gratuito acaba |
+| Roteiro gerado por IA (D2) | Chaves OpenRouter e Gemini (gratuitas) | **Validado em post real**: com o OpenRouter sem cota, o Gemini escreveu o roteiro |
 | Publicação na conta real do TikTok (D2) | App sandbox + conta de teste privada | **Validada**: `PUBLISH_COMPLETE` em 06/10/2026, com aprovação pelo Telegram |
 
 ## Estrutura

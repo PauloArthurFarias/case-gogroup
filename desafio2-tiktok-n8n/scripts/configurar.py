@@ -45,19 +45,44 @@ def chat_id_telegram(token: str) -> str | None:
     return None
 
 
-def modelo_gemini_gratuito(chave: str) -> str:
-    """Escolhe o Flash estável mais recente disponível para a chave (evita preview/experimental)."""
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+
+def _versao(modelo: str) -> list[int]:
+    return [int(x) if x.isdigit() else 0 for x in modelo.split("-")[1].split(".")]
+
+
+def _responde(chave: str, modelo: str) -> float | None:
+    """Tempo de resposta (s) de uma chamada mínima, ou None se falhar."""
+    import time
+    corpo = {"model": modelo, "response_format": {"type": "json_object"},
+             "messages": [{"role": "user", "content": 'Responda só {"ok": true}'}]}
+    req = urllib.request.Request(f"{GEMINI_URL}/chat/completions", data=json.dumps(corpo).encode(),
+                                 headers={"Authorization": f"Bearer {chave}", "Content-Type": "application/json"})
+    t = time.time()
     try:
-        req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/openai/models",
-                                     headers={"Authorization": f"Bearer {chave}"})
+        with urllib.request.urlopen(req, timeout=30):
+            return time.time() - t
+    except Exception:
+        return None
+
+
+def modelos_gemini(chave: str) -> tuple[str, str]:
+    """(principal, reserva): o Flash que respondeu mais rápido agora e o Flash-Lite mais novo.
+    Modelos muito novos costumam ficar sobrecarregados (HTTP 503); por isso medimos em vez de pegar o último."""
+    padrao = ("gemini-3.5-flash", "gemini-3.5-flash-lite")
+    try:
+        req = urllib.request.Request(f"{GEMINI_URL}/models", headers={"Authorization": f"Bearer {chave}"})
         with urllib.request.urlopen(req, timeout=30) as r:
             ids = [m["id"].removeprefix("models/") for m in json.load(r).get("data", [])]
-        candidatos = sorted((i for i in ids if i.startswith("gemini-") and i.endswith("-flash")),
-                            key=lambda i: [int(x) if x.isdigit() else 0 for x in i.split("-")[1].split(".")],
-                            reverse=True)
-        return candidatos[0] if candidatos else "gemini-2.5-flash"
     except Exception:
-        return "gemini-2.5-flash"
+        return padrao
+    flash = sorted((i for i in ids if i.startswith("gemini-") and i.endswith("-flash")), key=_versao, reverse=True)
+    lite = sorted((i for i in ids if i.startswith("gemini-") and i.endswith("-flash-lite")), key=_versao, reverse=True)
+    tempos = {m: t for m in flash[:4] if (t := _responde(chave, m)) is not None}
+    principal = min(tempos, key=tempos.get) if tempos else (flash[0] if flash else padrao[0])
+    reserva = next((m for m in lite if _responde(chave, m) is not None), lite[0] if lite else padrao[1])
+    return principal, reserva
 
 
 def pexels_ok(chave: str) -> bool:
@@ -102,8 +127,11 @@ def main() -> int:
     if chave_gm:
         local["gemini_cred_id"] = n.credencial("Gemini", "httpHeaderAuth",
                                                {"name": "Authorization", "value": f"Bearer {chave_gm}"})
-        local["modelo_gemini"] = env.get("GEMINI_MODELO") or modelo_gemini_gratuito(chave_gm)
-        print(f"Gemini (reserva): credencial configurada, modelo {local['modelo_gemini']}")
+        principal, lite = modelos_gemini(chave_gm)
+        local["modelo_gemini"] = env.get("GEMINI_MODELO") or principal
+        local["modelo_gemini_lite"] = lite
+        print(f"Gemini (reserva): credencial configurada, modelo {local['modelo_gemini']} "
+              f"(segunda tentativa: {lite})")
     else:
         print("Gemini (reserva): sem chave")
 

@@ -59,13 +59,19 @@ Copie a URL `https://....trycloudflare.com` e:
 Depois do login, o túnel só é necessário para a aprovação pelo celular. A publicação é feita do n8n para o
 TikTok, sem túnel. O token de acesso dura 24 h e se renova sozinho pelo refresh token, que vale 365 dias.
 
+## 5b. Chaves gratuitas opcionais
+- **Gemini** (reserva de IA): <https://aistudio.google.com/apikey> → **Create API key** → `GEMINI_API_KEY` no `.env`.
+- **Pixabay** (fotos de fundo): crie a conta e copie a chave em <https://pixabay.com/api/docs/> →
+  `PIXABAY_API_KEY` no `.env`. O Pexels (`PEXELS_API_KEY`) também funciona, se estiver emitindo chaves.
+
 ## 6. Aplicar a configuração
 ```powershell
 cd desafio2-tiktok-n8n
 python scripts\configurar.py
 ```
 O script:
-- cria no n8n as credenciais **OpenRouter** e **Telegram**;
+- cria no n8n as credenciais **OpenRouter**, **Gemini** e **Telegram**;
+- escolhe o modelo Gemini pela latência medida e valida a chave de fotos;
 - encontra o seu chat do Telegram;
 - grava `workflows/src/local.json`, que fica fora do git;
 - gera, importa e ativa os workflows com essa configuração.

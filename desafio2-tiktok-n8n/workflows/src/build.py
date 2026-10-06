@@ -128,7 +128,8 @@ def workflow_principal() -> None:
         ("usar_ia", True, "boolean"),
         ("provedor_ia", LOCAL.get("provedor_ia", "openrouter"), "string"),
         ("modelo_openrouter", LOCAL.get("modelo_openrouter", "nvidia/nemotron-3-super-120b-a12b:free"), "string"),
-        ("modelo_gemini", LOCAL.get("modelo_gemini", "gemini-2.5-flash"), "string"),
+        ("modelo_gemini", LOCAL.get("modelo_gemini", "gemini-3.5-flash"), "string"),
+        ("modelo_gemini_lite", LOCAL.get("modelo_gemini_lite", "gemini-3.5-flash-lite"), "string"),
         ("modelo", "claude-opus-5-5", "string"),
         ("media_api", MEDIA, "string"),
         ("privacidade_preferida", "SELF_ONLY", "string"),
@@ -202,7 +203,7 @@ def workflow_principal() -> None:
     # falha ou estoura a cota diária; se o Gemini também falhar, o banco de roteiros assume.
     corpo_gemini = (
         "={{ JSON.stringify({\n"
-        "  model: $('Config').first().json.modelo_gemini,\n"
+        "  model: $('Config').first().json.__CAMPO__,\n"
         "  temperature: 0.8,\n"
         "  response_format: { type: 'json_object' },\n"
         "  messages: [\n"
@@ -219,7 +220,8 @@ def workflow_principal() -> None:
         "}) }}"
     )
     w.node("Gemini: gerar roteiro (reserva)", "n8n-nodes-base.httpRequest", 4.2, http(
-        "POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", corpo_gemini,
+        "POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        corpo_gemini.replace("__CAMPO__", "modelo_gemini"),
         authentication="genericCredentialType", genericAuthType="httpHeaderAuth",
         options={"timeout": 120000}),
         (1060, 560), onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000,
@@ -231,10 +233,30 @@ def workflow_principal() -> None:
         "const texto = r.choices?.[0]?.message?.content || '';\n"
         "const m = texto.match(/\\{[\\s\\S]*\\}/);\n"
         "if (!m) throw new Error('Resposta sem JSON');\n"
-        "return [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + $('Config').first().json.modelo_gemini,\n"
+        "return [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + (r.model || 'gemini'),\n"
         "  tokens: r.usage?.total_tokens || 0 } }];\n")},
         (1280, 560), onError="continueErrorOutput")
     w.link("Gemini: gerar roteiro (reserva)", "Ler resposta (Gemini)", 0)
+
+    # Segunda tentativa: modelo Flash-Lite (mais disponível quando o Flash está sobrecarregado, HTTP 503).
+    w.node("Gemini Lite: segunda tentativa", "n8n-nodes-base.httpRequest", 4.2, http(
+        "POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        corpo_gemini.replace("__CAMPO__", "modelo_gemini_lite"),
+        authentication="genericCredentialType", genericAuthType="httpHeaderAuth",
+        options={"timeout": 120000}),
+        (1060, 680), onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000,
+        notes="Se o Flash principal falhar ou estiver sobrecarregado, tenta o Flash-Lite.",
+        **cred("httpHeaderAuth", "gemini_cred_id", "Gemini"))
+    w.node("Ler resposta (Gemini Lite)", "n8n-nodes-base.code", 2, {"jsCode": (
+        "const r = $json;\n"
+        "if (r.error) throw new Error('Gemini Lite: ' + JSON.stringify(r.error));\n"
+        "const texto = r.choices?.[0]?.message?.content || '';\n"
+        "const m = texto.match(/\\{[\\s\\S]*\\}/);\n"
+        "if (!m) throw new Error('Resposta sem JSON');\n"
+        "return [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + (r.model || 'gemini-lite'),\n"
+        "  tokens: r.usage?.total_tokens || 0 } }];\n")},
+        (1280, 680), onError="continueErrorOutput")
+    w.link("Gemini Lite: segunda tentativa", "Ler resposta (Gemini Lite)", 0)
 
     corpo_claude = (
         "={{ JSON.stringify({\n"
@@ -267,15 +289,17 @@ def workflow_principal() -> None:
         (1060, 20), onError="continueErrorOutput")
     w.link("Claude: gerar roteiro", "Ler resposta da IA", 0)
 
-    w.node("Banco de roteiros", "n8n-nodes-base.code", 2, {"jsCode": banco}, (1060, 760),
+    w.node("Banco de roteiros", "n8n-nodes-base.code", 2, {"jsCode": banco}, (1060, 860),
            notes="Fallback sem custo: usado com usar_ia=false ou quando a IA falha.")
     w.link("Usar IA?", "Banco de roteiros", 1)
     w.link("Claude: gerar roteiro", "Banco de roteiros", 1)
     w.link("Ler resposta da IA", "Banco de roteiros", 1)
     w.link("OpenRouter: gerar roteiro", "Gemini: gerar roteiro (reserva)", 1)
     w.link("Ler resposta (OpenRouter)", "Gemini: gerar roteiro (reserva)", 1)
-    w.link("Gemini: gerar roteiro (reserva)", "Banco de roteiros", 1)
-    w.link("Ler resposta (Gemini)", "Banco de roteiros", 1)
+    w.link("Gemini: gerar roteiro (reserva)", "Gemini Lite: segunda tentativa", 1)
+    w.link("Ler resposta (Gemini)", "Gemini Lite: segunda tentativa", 1)
+    w.link("Gemini Lite: segunda tentativa", "Banco de roteiros", 1)
+    w.link("Ler resposta (Gemini Lite)", "Banco de roteiros", 1)
 
     w.node("Normalizar roteiro", "n8n-nodes-base.code", 2, {"jsCode": (
         "const cfg = $('Config').first().json;\n"
@@ -299,6 +323,7 @@ def workflow_principal() -> None:
     w.link("Ler resposta da IA", "Normalizar roteiro", 0)
     w.link("Ler resposta (OpenRouter)", "Normalizar roteiro", 0)
     w.link("Ler resposta (Gemini)", "Normalizar roteiro", 0)
+    w.link("Ler resposta (Gemini Lite)", "Normalizar roteiro", 0)
     w.link("Banco de roteiros", "Normalizar roteiro", 0)
 
     w.node("Renderizar vídeo", "n8n-nodes-base.httpRequest", 4.2, http(

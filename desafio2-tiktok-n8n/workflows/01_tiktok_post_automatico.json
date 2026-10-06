@@ -113,9 +113,15 @@
               "type": "string"
             },
             {
-              "id": "ddd475b4-e0a3-52d2-8c7c-592dc5a8be6b",
+              "id": "9316a503-6af9-598b-8a8a-6063e2b19d3f",
               "name": "modelo_gemini",
-              "value": "gemini-2.5-flash",
+              "value": "gemini-3.5-flash",
+              "type": "string"
+            },
+            {
+              "id": "82462b3b-2da5-5b33-ae84-3cfa4031bab5",
+              "name": "modelo_gemini_lite",
+              "value": "gemini-3.5-flash-lite",
               "type": "string"
             },
             {
@@ -314,7 +320,48 @@
         560
       ],
       "parameters": {
-        "jsCode": "const r = $json;\nif (r.error) throw new Error('Gemini: ' + JSON.stringify(r.error));\nconst texto = r.choices?.[0]?.message?.content || '';\nconst m = texto.match(/\\{[\\s\\S]*\\}/);\nif (!m) throw new Error('Resposta sem JSON');\nreturn [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + $('Config').first().json.modelo_gemini,\n  tokens: r.usage?.total_tokens || 0 } }];\n"
+        "jsCode": "const r = $json;\nif (r.error) throw new Error('Gemini: ' + JSON.stringify(r.error));\nconst texto = r.choices?.[0]?.message?.content || '';\nconst m = texto.match(/\\{[\\s\\S]*\\}/);\nif (!m) throw new Error('Resposta sem JSON');\nreturn [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + (r.model || 'gemini'),\n  tokens: r.usage?.total_tokens || 0 } }];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "6eae94df-063c-5e18-bc87-f85cc4fd144b",
+      "name": "Gemini Lite: segunda tentativa",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        680
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: $('Config').first().json.modelo_gemini_lite,\n  temperature: 0.8,\n  response_format: { type: 'json_object' },\n  messages: [\n    { role: 'system', content: \"Você é roteirista de vídeos curtos (TikTok, 20 a 40 segundos) de um perfil brasileiro sobre automação, IA e produtividade para empresas (financeiro, indústria, supply, RPA, n8n).\\n\\nEscreva em português do Brasil, tom direto e próximo, sem jargão desnecessário.\\n\\nEstrutura obrigatória:\\n- gancho: até 12 palavras, provocativo, que prenda nos 2 primeiros segundos (pergunta, dado surpreendente ou erro comum).\\n- emoji_gancho: 1 emoji que represente o gancho.\\n- imagem_gancho: 2 a 4 palavras-chave EM INGLÊS para buscar uma foto de fundo (ex.: \\\"stressed office worker\\\").\\n- cenas: 3 ou 4 cenas. Em cada uma:\\n  - `texto`: o que aparece na tela (até 8 palavras);\\n  - `narracao`: a fala (1 a 2 frases curtas, até 25 palavras);\\n  - `emoji`: 1 emoji que ilustre a cena;\\n  - `imagem`: 2 a 4 palavras-chave EM INGLÊS para a foto de fundo da cena (objetos ou ambientes concretos, sem texto).\\n- cta: chamada final curta (seguir, comentar uma palavra, salvar).\\n- hashtags: 4 a 6, minúsculas, relevantes em português.\\n\\nRegras:\\n- Uma ideia prática e verdadeira por vídeo. Nada de promessas exageradas (\\\"fique rico\\\", \\\"100% garantido\\\").\\n- Não cite marcas, empresas ou pessoas reais.\\n- Duração total da narração: até 40 segundos (cerca de 100 palavras).\\n\\n\\nResponda SOMENTE com um JSON neste formato (sem texto fora do JSON):\\n{\\\"tema\\\": \\\"...\\\", \\\"gancho\\\": \\\"...\\\", \\\"emoji_gancho\\\": \\\"🚨\\\", \\\"imagem_gancho\\\": \\\"english keywords\\\", \\\"cenas\\\": [{\\\"texto\\\": \\\"...\\\", \\\"narracao\\\": \\\"...\\\", \\\"emoji\\\": \\\"💡\\\", \\\"imagem\\\": \\\"english keywords\\\"}], \\\"cta\\\": \\\"...\\\", \\\"hashtags\\\": [\\\"...\\\"]}\" },\n    { role: 'user', content: 'Tema: ' + ($('Config').first().json.tema || 'escolha um tema útil de automação para empresas') }\n  ]\n}) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "notes": "Se o Flash principal falhar ou estiver sobrecarregado, tenta o Flash-Lite."
+    },
+    {
+      "id": "ad920504-a5ac-50d0-b7f4-76a043a72269",
+      "name": "Ler resposta (Gemini Lite)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        680
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nif (r.error) throw new Error('Gemini Lite: ' + JSON.stringify(r.error));\nconst texto = r.choices?.[0]?.message?.content || '';\nconst m = texto.match(/\\{[\\s\\S]*\\}/);\nif (!m) throw new Error('Resposta sem JSON');\nreturn [{ json: { ...JSON.parse(m[0]), origem: 'ia:gemini/' + (r.model || 'gemini-lite'),\n  tokens: r.usage?.total_tokens || 0 } }];\n"
       },
       "onError": "continueErrorOutput"
     },
@@ -378,7 +425,7 @@
       "typeVersion": 2,
       "position": [
         1060,
-        760
+        860
       ],
       "parameters": {
         "jsCode": "// Banco de roteiros: usado quando a IA está desligada (sem chave) ou falha.\n// Escolhe pelo tema informado (busca por palavra) ou faz rodízio pelo dia do ano.\nconst banco = [\n  {\n    tema: \"nota fiscal\",\n    emoji_gancho: \"📄\",\n    imagem_gancho: \"stressed office worker paperwork\",\n    gancho: \"Seu time ainda digita nota fiscal à mão?\",\n    cenas: [\n      { texto: \"O XML da NF-e já traz tudo pronto\", narracao: \"O XML da nota fiscal eletrônica já traz todos os dados prontos. Digitar é desperdício.\", emoji: \"⌨️\", imagem: \"invoice documents desk\" },\n      { texto: \"Um robô confere com o pedido de compra\", narracao: \"Um robô lê o XML e confere item a item com o pedido de compra e com o que chegou no almoxarifado.\", emoji: \"🔍\", imagem: \"warehouse boxes inventory\" },\n      { texto: \"Só as exceções chegam para você\", narracao: \"Você só olha as exceções: preço diferente, quantidade a mais ou nota duplicada.\", emoji: \"🙌\", imagem: \"relaxed person laptop\" },\n    ],\n    cta: \"Quer o passo a passo? Siga para a parte 2!\",\n    hashtags: [\"#automacao\", \"#rpa\", \"#financeiro\", \"#notafiscal\", \"#produtividade\"],\n  },\n  {\n    tema: \"golpe do boleto\",\n    emoji_gancho: \"🚨\",\n    imagem_gancho: \"scam warning phone\",\n    gancho: \"Esse boleto parece certo. Mas é golpe.\",\n    cenas: [\n      { texto: \"Nome do fornecedor certo, CNPJ errado\", narracao: \"No golpe do boleto, o nome do fornecedor está certo, mas o CNPJ do beneficiário é de outra pessoa.\", emoji: \"🧾\", imagem: \"invoice paper\" },\n      { texto: \"A automação compara com o cadastro\", narracao: \"Uma automação simples compara o beneficiário com o cadastro de fornecedores antes de pagar.\", emoji: \"🤖\", imagem: \"office computer screen\" },\n      { texto: \"E valida os dígitos da linha digitável\", narracao: \"E ainda valida os dígitos verificadores da linha digitável e o valor do código de barras.\", emoji: \"🔢\", imagem: \"barcode scanner\" },\n    ],\n    cta: \"Salve este vídeo e mostre para o seu financeiro!\",\n    hashtags: [\"#golpedoboleto\", \"#seguranca\", \"#financeiro\", \"#automacao\", \"#dica\"],\n  },\n  {\n    tema: \"n8n\",\n    emoji_gancho: \"⚡\",\n    imagem_gancho: \"automation workflow screen\",\n    gancho: \"Automatizei meu TikTok com n8n. Sem programar.\",\n    cenas: [\n      { texto: \"A IA escreve o roteiro\", narracao: \"Primeiro, uma IA escreve o roteiro com gancho, cenas e chamada para ação.\", emoji: \"🧠\", imagem: \"person writing notes\" },\n      { texto: \"O vídeo é montado sozinho\", narracao: \"Depois o vídeo é montado sozinho: narração, legendas e formato vertical.\", emoji: \"🎬\", imagem: \"video editing setup\" },\n      { texto: \"E publicado pela API oficial\", narracao: \"Por fim, o n8n publica pela API oficial do TikTok e registra tudo numa planilha.\", emoji: \"🚀\", imagem: \"smartphone social media\" },\n    ],\n    cta: \"Comenta 'n8n' que eu te mando o fluxo!\",\n    hashtags: [\"#n8n\", \"#automacao\", \"#nocode\", \"#ia\", \"#tiktokdicas\"],\n  },\n  {\n    tema: \"chão de fábrica\",\n    emoji_gancho: \"🏭\",\n    imagem_gancho: \"factory production line\",\n    gancho: \"Sua fábrica perde dinheiro em paradas que ninguém registra.\",\n    cenas: [\n      { texto: \"Operador manda áudio no WhatsApp\", narracao: \"O operador só manda um áudio no WhatsApp dizendo o que parou e por quê.\", emoji: \"🎙️\", imagem: \"worker phone factory\" },\n      { texto: \"A IA classifica a causa\", narracao: \"A inteligência artificial transcreve, classifica a causa e calcula o tempo parado.\", emoji: \"🤖\", imagem: \"artificial intelligence technology\" },\n      { texto: \"O gestor recebe o relatório do turno\", narracao: \"No fim do turno, o gestor recebe o relatório pronto, com as maiores perdas.\", emoji: \"📊\", imagem: \"manager reading report\" },\n    ],\n    cta: \"Siga para ver mais automações industriais!\",\n    hashtags: [\"#industria\", \"#manufatura\", \"#automacao\", \"#ia\", \"#oee\"],\n  },\n  {\n    tema: \"planilha\",\n    emoji_gancho: \"📊\",\n    imagem_gancho: \"spreadsheet laptop office\",\n    gancho: \"3 tarefas de planilha que um robô faz por você.\",\n    cenas: [\n      { texto: \"1. Juntar relatórios de vários e-mails\", narracao: \"Um: juntar relatórios que chegam em vários e-mails numa planilha só.\", emoji: \"📧\", imagem: \"email inbox laptop\" },\n      { texto: \"2. Conciliar extrato com contas a pagar\", narracao: \"Dois: conciliar o extrato do banco com o contas a pagar.\", emoji: \"🏦\", imagem: \"bank finance documents\" },\n      { texto: \"3. Mandar alerta de vencimento\", narracao: \"Três: mandar alerta antes de cada vencimento, para nunca mais pagar juros.\", emoji: \"⏰\", imagem: \"calendar alarm clock\" },\n    ],\n    cta: \"Qual dessas você quer aprender? Comenta!\",\n    hashtags: [\"#excel\", \"#planilha\", \"#automacao\", \"#rpa\", \"#produtividade\"],\n  },\n];\n\nconst tema = ($json.tema || \"\").toString().trim();\nconst normalizar = (s) => s.normalize(\"NFD\").replace(/[̀-ͯ]/g, \"\").toLowerCase();\nlet escolhido = tema\n  ? banco.find((r) => normalizar(tema).includes(normalizar(r.tema)) || normalizar(r.tema).includes(normalizar(tema)))\n  : null;\nif (!escolhido) {\n  const inicio = new Date(new Date().getFullYear(), 0, 0);\n  const diaDoAno = Math.floor((Date.now() - inicio) / 86400000);\n  escolhido = banco[diaDoAno % banco.length];\n}\nreturn [{ json: { ...escolhido, tema: tema || escolhido.tema, origem: \"banco\" } }];\n"
@@ -1101,6 +1148,24 @@
         ],
         [
           {
+            "node": "Gemini Lite: segunda tentativa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Lite: segunda tentativa": {
+      "main": [
+        [
+          {
+            "node": "Ler resposta (Gemini Lite)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Banco de roteiros",
             "type": "main",
             "index": 0
@@ -1163,6 +1228,24 @@
       ]
     },
     "Ler resposta (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Normalizar roteiro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gemini Lite: segunda tentativa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler resposta (Gemini Lite)": {
       "main": [
         [
           {

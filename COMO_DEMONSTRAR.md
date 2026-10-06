@@ -93,17 +93,18 @@ Mostra a decisão de cada nota real. Detalhes no README do Desafio 1.
 e entre com `admin@case.local` / `CaseGoGroup2026!`.
 
 A instância local está configurada no **modo completo**: TikTok real (conta de teste privada), roteiro por IA
-gratuita e aprovação pelo Telegram. Cada publicação vai de verdade para a conta de teste, como vídeo privado.
+gratuita (OpenRouter, com Gemini de reserva), vídeo com fotos do Pixabay, legendas dinâmicas e trilha, e
+aprovação pelo Telegram. Cada publicação vai de verdade para a conta de teste, como vídeo privado.
 Para demonstrar sem conta nenhuma, veja "Modo simulador" no README do Desafio 2.
 
 | Passo | O que fazer | O que observar |
 |---|---|---|
 | 1 | Abra o workflow **TikTok · Post automático com IA** | O fluxo desenhado: gatilhos → IA (OpenRouter ou Claude) / banco de roteiros → vídeo → aprovação → publicação → log |
 | 2 | Clique em **Execute workflow** (gatilho "Testar agora") | Os nós acendem em sequência; o fluxo **pausa** em "Telegram: aprovar?" |
-| 3 | No Telegram, abra a conversa com o seu bot | Chegam o vídeo, com a legenda, e a pergunta com os botões **Publicar** / **Descartar** |
+| 3 | No Telegram, abra a conversa com o seu bot | Chegam o vídeo (fotos, emojis, legendas palavra a palavra, trilha) e a pergunta com os botões **Publicar** / **Descartar** |
 | 4 | Toque em **Publicar** (use o Telegram no próprio computador, Web ou Desktop, ou veja a nota abaixo) | O n8n retoma: token, envio ao TikTok, consulta de status até `PUBLISH_COMPLETE` |
 | 5 | Abra o TikTok com a conta de teste → Perfil | O vídeo publicado, com cadeado (privado) |
-| 6 | No n8n, clique nos nós **Normalizar roteiro**, **Renderizar vídeo** e **Consultar status** | Roteiro gerado (origem `ia:` ou `banco`), link do vídeo, `publish_id` e status |
+| 6 | No n8n, clique nos nós **Normalizar roteiro**, **Renderizar vídeo** e **Consultar status** | Roteiro gerado, com a origem (`ia:` + modelo usado, ou `banco`); link do vídeo, quantas cenas tiveram foto; `publish_id` e status |
 | 7 | Abra <http://127.0.0.1:8765/log> | Histórico com `modo: api-real` |
 | 8 | Repita o passo 2 e toque em **Descartar** | Nada é publicado; o log registra `DESCARTADO` |
 | 9 | Aba **Executions** e workflow **TikTok · Autenticação** | Todas as execuções; login OAuth, callback e renovação automática do token |
