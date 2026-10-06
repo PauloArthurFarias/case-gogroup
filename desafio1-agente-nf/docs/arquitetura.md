@@ -9,7 +9,7 @@
 | Extração XML | `extract/nfe_xml.py` | Lê NF-e 4.00 (`infNFe`, `det/prod`, `ICMSTot`, `cobr/dup`, `xPed`) | Não |
 | Extração PDF | `extract/pdf_documento.py` | DANFE/boleto → `ExtracaoLLM` pelo provedor configurado; falhou → regex | Sim |
 | Dados mestres | `cadastros.py` | Fornecedores, pedidos, recebimentos | Não |
-| Validação | `validacao.py` | 15 regras com severidade OK/ALERTA/CRITICO | Não |
+| Validação | `validacao.py` | 21 regras com severidade OK/ALERTA/CRITICO | Não |
 | Decisão | `agente.py` | Regras + agente com ferramentas + guard-rail | Sim (só exceções) |
 | Persistência | `store.py` | SQLite: `documentos`, `verificacoes`, `auditoria` | Não |
 | Interfaces | `__main__.py`, `dashboard.py`, `mcp_server.py` | CLI, painel, MCP | — |

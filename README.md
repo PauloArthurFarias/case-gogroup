@@ -5,7 +5,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 | | Desafio 1: Agente de IA | Desafio 2: TikTok automático |
 |---|---|---|
 | **O quê** | Agente de Contas a Pagar: lê NF-e/DANFE/boletos, faz o 3-way match, barra fraude e duplicidade, entrega só as exceções ao analista | Fluxo n8n que cria roteiro com IA, monta o vídeo 9:16 com narração e publica pela API oficial do TikTok |
-| **Stack** | Python, Claude API (PDF + tool use), SQLite, Streamlit, **servidor MCP** | **n8n 2.41**, Claude API, edge-tts, ffmpeg, TikTok Content Posting API, **servidor MCP no n8n** |
+| **Stack** | Python, IA (Claude ou modelo gratuito via OpenRouter), e-mail IMAP, SQLite, Streamlit, **servidor MCP** | **n8n 2.41**, Claude API, edge-tts, ffmpeg, TikTok Content Posting API, **servidor MCP no n8n** |
 | **Pasta** | [`desafio1-agente-nf/`](desafio1-agente-nf/) | [`desafio2-tiktok-n8n/`](desafio2-tiktok-n8n/) |
 | **Comece por** | [README](desafio1-agente-nf/README.md) · [Plano de implantação](desafio1-agente-nf/docs/plano-implantacao.md) | [README](desafio2-tiktok-n8n/README.md) · [Setup do TikTok](desafio2-tiktok-n8n/docs/setup-tiktok.md) |
 
@@ -16,7 +16,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 
 | Requisito do documento | Entrega |
 |---|---|
-| Agente de IA/automação criado com ferramenta de apoio (Claude Code, Cursor...) | Todo o código foi desenvolvido com Claude Code; o agente usa a Claude API |
+| Agente de IA/automação criado com ferramenta de apoio (Claude Code, Cursor...) | Todo o código foi desenvolvido com Claude Code; o agente usa IA (Claude ou modelo gratuito via OpenRouter, validado com modelo real) |
 | Otimizar processo de uma área de negócio | Financeiro / Contas a Pagar |
 | Dor real, ganho de tempo/eficiência/inteligência | Digitação e conferência manual de NF, duplicidade, golpe do boleto, multas por atraso ([README D1](desafio1-agente-nf/README.md#a-dor)) |
 | Documentação completa da automação | [README](desafio1-agente-nf/README.md) + [arquitetura, regras, modelo de dados, runbook](desafio1-agente-nf/docs/arquitetura.md) |
@@ -27,8 +27,8 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 | Publicação automática | TikTok Content Posting API (Direct Post) com OAuth e renovação de token |
 | Usuários de teste | Sandbox + conta de teste no TikTok for Developers ([setup](desafio2-tiktok-n8n/docs/setup-tiktok.md)); simulador da API para testes locais |
 | Inovar / melhorias | Aprovação humana, *fallback* sem IA, *structured output*, vídeo a custo zero, workflow de erros, simulador ([diferenciais](desafio2-tiktok-n8n/README.md#diferenciais)) |
-| **Se possível, integração com MCP** | **Duas:** servidor MCP do agente financeiro (Python, 7 ferramentas) e servidor MCP no n8n (`criar_post_tiktok`) |
-| Ferramentas pagas só com aprovação | Tudo roda de graça; o único custo opcional é a Claude API (≈ US$ 1/mês no D2, ≈ US$ 27/mês no D1 em produção) |
+| **Se possível, integração com MCP** | **Duas:** servidor MCP do agente financeiro (Python, 8 ferramentas) e servidor MCP no n8n (`criar_post_tiktok`) |
+| Ferramentas pagas só com aprovação | Nada pago foi usado: a demo do D1 roda com modelo gratuito (OpenRouter). Em produção, a recomendação é a Claude API (≈ US$ 27/mês no D1, ≈ US$ 1/mês no D2), sujeita a aprovação |
 
 ## Como foi validado
 

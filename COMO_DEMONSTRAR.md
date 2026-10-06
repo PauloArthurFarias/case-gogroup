@@ -1,7 +1,7 @@
 # Como demonstrar
 
-Roteiro para ver as duas aplicações funcionando do ponto de vista do usuário. Cada desafio leva cerca de
-5 minutos.
+Roteiro para ver as duas aplicações funcionando do ponto de vista do usuário. O Desafio 1 leva cerca de
+15 minutos; o Desafio 2, cerca de 5.
 
 > **Memória:** n8n + Streamlit + navegador pesam. Em máquina com pouca RAM, demonstre um desafio por vez
 > (`.\demo.ps1 -Somente d1`, feche, depois `.\demo.ps1 -Somente d2`).
@@ -22,18 +22,30 @@ Se o PowerShell bloquear scripts: `powershell -ExecutionPolicy Bypass -File .\de
 
 **Papel:** analista do financeiro que recebe notas e boletos por e-mail.
 
-| Passo | O que fazer no painel | O que observar |
+**Antes de começar:** o `.env` de `desafio1-agente-nf` precisa ter a chave de IA e a caixa de e-mail
+(veja o README do Desafio 1). Sem eles, tudo funciona em modo offline: a DANFE vai para revisão e o botão de
+e-mail fica desabilitado.
+
+| Passo | O que fazer | O que observar |
 |---|---|---|
-| 1 | Barra lateral → **Processar novos da inbox** | 11 documentos lidos e decididos em segundos |
-| 2 | KPIs no topo | 4 aprovados, 3 em revisão, 4 rejeitados; **valor bloqueado** em R$ |
-| 3 | Aba **Fila de revisão** | Cada pendência explicada: "preço 8% acima do pedido", "faturado 500, recebido 400", "PDF com confiança baixa" |
-| 4 | Escreva uma observação e clique **Aprovar** em uma pendência | Ela sai da fila; o KPI "decididos sem intervenção" muda |
-| 5 | Aba **Todos** | Os rejeitados: **golpe do boleto** (nome do fornecedor real, CNPJ de terceiro), **nota duplicada**, **chave adulterada**, **fornecedor fora do cadastro** |
-| 6 | "Detalhar documento" | Dados extraídos da NF (itens, valores, chave) em JSON |
-| 7 | Aba **Vencimentos** | O que pagar nos próximos dias, com total (a NF que vence em 2 dias aparece como prioridade) |
-| 8 | Aba **Auditoria** | Toda decisão com autor (regra, agente ou `humano:<nome>`) e horário |
-| 9 | Barra lateral → envie um XML da pasta `inbox/` de novo → **Processar arquivo enviado** | Rejeitado na hora por **duplicidade** |
-| 10 | Com o e-mail configurado (README do Desafio 1): mande para a caixa de teste um e-mail com notas anexadas e clique em **Buscar e-mails** | Os anexos chegam sozinhos à inbox e aparecem decididos; a Auditoria mostra `EMAIL_RECEBIDO` |
+| 1 | `.\demo.ps1 -Somente d1` | Recria os 11 documentos fictícios, zera a base e abre o painel. O topo mostra o modelo de IA em uso |
+| 2 | Recorte `nfe_010_paletes_vence_em_2_dias.xml` e `boleto_009_fraude_beneficiario.pdf` de `desafio1-agente-nf\inbox` para a Área de Trabalho | Esses dois vão chegar por e-mail no passo 6 |
+| 3 | Barra lateral → **Processar novos da inbox** | 9 documentos decididos (cerca de 1 min com IA): 4 aprovados, 2 em revisão, 3 rejeitados |
+| 4 | Aba **Fila de revisão** | Preço 8% acima do pedido e 100 luvas cobradas sem entrega, cada uma com justificativa e ação sugerida escritas pelo agente |
+| 5 | Escreva seu nome e uma observação, clique **Aprovar** numa pendência; depois aba **Auditoria** | A decisão humana fica registrada com autor e horário |
+| 6 | Do seu e-mail pessoal, envie os 2 arquivos do passo 2 para a caixa de teste; no painel, **Buscar e-mails** | A NF dos paletes é aprovada com **PRIORIDADE** (vence em 2 dias) e o boleto é **REJEITADO por golpe** (nome do fornecedor real, CNPJ de terceiro). A Auditoria mostra `EMAIL_RECEBIDO` |
+| 7 | Aba **Todos** → "Detalhar documento" na DANFE | Os dados que a IA leu do PDF; os rejeitados com o motivo (duplicidade, chave adulterada, fornecedor fora do cadastro, golpe) |
+| 8 | Aba **Vencimentos** | O que pagar nos próximos dias, com total |
+| 9 | Barra lateral → envie de novo um XML já processado → **Processar arquivo enviado** | Rejeitado na hora por **duplicidade** |
+
+Resultado final esperado com IA: **5 aprovados, 2 em revisão, 4 rejeitados**. Sem IA: 4, 3 e 4, porque a
+DANFE em PDF vai para revisão.
+
+**Se algo der errado:**
+- **IA lenta ou erro 429 no log:** limite do modelo gratuito. Os documentos são decididos pelas regras e a
+  demonstração continua; espere alguns minutos para repetir.
+- **"Buscar e-mails" não encontra nada:** confira se o e-mail chegou como **não lido** na caixa de teste.
+- **Recomeçar do zero:** rode `.\demo.ps1 -Somente d1` de novo. O script fecha o painel anterior.
 
 ### Conversando com o agente (MCP)
 
@@ -41,9 +53,12 @@ Se o PowerShell bloquear scripts: `powershell -ExecutionPolicy Bypass -File .\de
 claude mcp add contas-a-pagar -- python "C:/Users/paulo/OneDrive/Área de Trabalho/Case-GoGroup/desafio1-agente-nf/mcp_server.py"
 ```
 
+Abra um terminal na pasta do case, rode `claude` e confira com `/mcp` que `contas-a-pagar` está conectado.
+O MCP usa a mesma base do painel: atualize o painel (F5) para ver as decisões feitas pelo chat.
+
 No Claude Code, peça em linguagem natural:
 - "O que está pendente de revisão e por quê?"
-- "Aprove a pendência 4, o reajuste foi acordado por e-mail. Meu nome é Paulo."
+- "Aprove a pendência das luvas: o restante foi entregue hoje. Meu nome é Paulo."
 - "Quanto tenho a pagar nos próximos 7 dias?"
 - "Me mostra o histórico do fornecedor de embalagens."
 - "Busque as notas novas no e-mail e me diga o que precisa da minha atenção."

@@ -89,7 +89,7 @@ Pré-requisito: Python 3.10+.
 ```bash
 cd desafio1-agente-nf
 pip install -r requirements.txt
-cp .env.example .env            # opcional: preencha ANTHROPIC_API_KEY para o modo com IA
+cp .env.example .env            # opcional: chave de IA e caixa de e-mail (veja as seções abaixo)
 
 python scripts/gerar_dados_ficticios.py --limpar   # 11 documentos fictícios na inbox/
 python -m ap_agent processar                      # processa a inbox (use --offline para forçar sem IA)
