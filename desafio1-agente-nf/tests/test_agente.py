@@ -17,6 +17,14 @@ from ap_agent.models import DocumentoFiscal, Item, Severidade, Status, TipoDocum
 from ap_agent.pipeline import processar_pasta  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def sem_credenciais_reais(monkeypatch):
+    """Os testes nunca usam o .env do desenvolvedor: nada de chamadas reais a IA ou e-mail."""
+    for nome, valor in {"LLM_PROVEDOR": "anthropic", "ANTHROPIC_API_KEY": "", "LLM_API_KEY": "",
+                        "LLM_MODELO": "", "EMAIL_USUARIO": "", "EMAIL_SENHA": ""}.items():
+        monkeypatch.setattr(config, nome, valor)
+
+
 @pytest.fixture
 def ambiente(tmp_path, monkeypatch):
     """Gera os dados fictícios num diretório temporário e aponta a config para ele."""
@@ -26,7 +34,6 @@ def ambiente(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", data)
     monkeypatch.setattr(config, "INBOX_DIR", inbox)
     monkeypatch.setattr(config, "DB_PATH", data / "teste.db")
-    monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "")
     gen.main(data_dir=data, inbox_dir=inbox)
     cadastros.recarregar()
     yield data, inbox

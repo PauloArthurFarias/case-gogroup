@@ -22,6 +22,10 @@ def extrair_nfe_xml(caminho: Path) -> DocumentoFiscal:
     root = ET.parse(caminho).getroot()
     inf = root.find(".//n:infNFe", NS)
     if inf is None:
+        raiz = root.tag.split("}")[-1].lower()
+        if "nfse" in raiz or "compnfse" in raiz:
+            raise ValueError("NFS-e (nota fiscal de serviço, padrão municipal) não é suportada nesta versão: "
+                             "lançar manualmente")
         raise ValueError("XML não contém infNFe: não parece ser uma NF-e")
 
     chave = so_digitos(inf.get("Id", "")) or so_digitos(_txt(root, ".//n:protNFe/n:infProt/n:chNFe"))

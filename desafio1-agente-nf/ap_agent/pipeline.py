@@ -78,8 +78,10 @@ def processar_pasta(pasta: Path | None = None, usar_llm: bool | None = None,
         inicio = time.perf_counter()
         try:
             extraidos.append((arq, extrair(arq), inicio))
-        except Exception as e:  # um arquivo ruim não derruba o lote
-            log.exception("Falha ao extrair %s", arq.name)
+        except Exception as e:  # um arquivo ruim não derruba o lote, mas fica registrado para o analista
+            log.warning("Falha ao extrair %s: %s", arq.name, e)
+            with store.conexao(db_path) as con:
+                store.auditar(con, None, "EXTRACAO_FALHOU", f"{arq.name}: {e}", "pipeline")
             extraidos.append((arq, e, inicio))
     extraidos.sort(key=lambda t: isinstance(t[1], DocumentoFiscal) and t[1].tipo == TipoDocumento.BOLETO)
 

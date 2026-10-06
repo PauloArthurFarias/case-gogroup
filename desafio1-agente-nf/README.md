@@ -213,11 +213,23 @@ devolver JSON inválido, o sistema volta sozinho para regex e regras.
 
 Estimativas de custo mensal em produção estão no [plano de implantação](docs/plano-implantacao.md#4-custos).
 
+## Validação com modelo real (06/10/2026)
+
+Executado com `nvidia/nemotron-3-super-120b-a12b:free` via OpenRouter. Hoje não há Qwen gratuito com suporte a ferramentas no OpenRouter.
+
+| Teste | Resultado |
+|---|---|
+| Demonstração completa (11 documentos) | 5 aprovados, 2 em revisão, 4 rejeitados, exatamente o esperado com IA |
+| DANFE em PDF (`danfe_008`) | Lida pelo modelo (CNPJ, valor, vencimento, pedido, item) e aprovada |
+| Exceções (6 documentos) | Investigadas pelo agente, que consultou ferramentas e escreveu justificativa e ação sugerida; o guard-rail manteve os 4 rejeitados |
+| E-mail real (Gmail, IMAP) | 5 mensagens não lidas lidas e marcadas; anexos XML/PDF salvos e processados; e-mails sem anexo ignorados |
+| Documento real recebido por e-mail | NFS-e de serviço: o PDF foi lido pela IA e rejeitado por prestador fora do cadastro (correto); o XML (padrão municipal GINFES) foi identificado como NFS-e, fora do escopo |
+
 ## Limitações conhecidas
 
 - **Cadastros em CSV:** em produção vêm do ERP (camada isolada em `cadastros.py`).
 - **E-mail por IMAP com senha de app:** em produção corporativa (Microsoft 365), o recomendado é OAuth via Graph API.
 - **Sem consulta à SEFAZ:** a situação da NF-e (autorizada/cancelada) entra na fase de integração.
 - **Impostos:** o agente não recalcula ICMS/IPI/retenções, só confere somas.
-- **Teste do modo com IA:** a suíte cobre extração e loop do agente com clientes simulados (Claude e
-  OpenAI-compatível). A validação com um modelo real exige uma chave no `.env`.
+- **Modelos gratuitos:** têm limite diário e podem ficar indisponíveis (erro 429). Quando isso acontece, o documento é decidido pelas regras, sem interromper o lote.
+- **NFS-e (nota de serviço):** não é suportada. O XML é recusado com mensagem explícita e registrado na auditoria (`EXTRACAO_FALHOU`).

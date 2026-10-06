@@ -32,7 +32,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 
 ## Como foi validado
 
-- **Desafio 1:** 10 testes automatizados (`pytest`), incluindo ponta a ponta com 11 documentos fictícios
+- **Desafio 1:** 16 testes automatizados (`pytest`), incluindo ponta a ponta com 11 documentos fictícios
   (todos com o status esperado), o guard-rail da IA e o loop do agente com cliente simulado. Servidor MCP
   testado com cliente MCP real. Painel Streamlit testado headless.
 - **Desafio 2:** executado no n8n 2.41.7 local. Post ponta a ponta disparado **pelo servidor MCP do n8n**
@@ -44,7 +44,8 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 
 | Item | Precisa de | Status |
 |---|---|---|
-| Extração de PDF e agente investigador com IA (D1) | `ANTHROPIC_API_KEY` | Código pronto; testado com cliente simulado e no modo offline |
+| Extração de PDF e agente investigador com IA (D1) | Chave de IA no `.env` (OpenRouter gratuito ou Claude) | **Validado com modelo real** (OpenRouter): demo 5/2/4, DANFE lida pela IA, exceções investigadas |
+| Leitura de notas por e-mail (D1) | Gmail com senha de app no `.env` | **Validado com caixa real**: anexos baixados, processados e auditados |
 | Roteiro gerado por IA (D2) | Credencial Anthropic no n8n | Nó pronto; *fallback* testado |
 | Publicação na conta real do TikTok (D2) | App aprovado no TikTok for Developers + túnel HTTPS | Passo a passo em [setup-tiktok.md](desafio2-tiktok-n8n/docs/setup-tiktok.md); troca simulador→real é um campo |
 
