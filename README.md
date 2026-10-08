@@ -18,7 +18,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 |---|---|---|
 | **1. Ler os guias completos** | nenhum | Do produto ao código, com o que é feito por IA e o que não é: [guia do Desafio 1 (PDF)](docs/guia-desafio1-agente-contas-a-pagar.pdf) · [guia do Desafio 2 (PDF)](docs/guia-desafio2-tiktok-n8n.pdf) |
 | **2. Usar o Desafio 1 online** | só um navegador | **[Painel do agente de contas a pagar](https://agente-contas-a-pagar.streamlit.app/)**, com IA gratuita: processar os 11 documentos, ver aprovados, revisões e golpes barrados, decidir pendências, enviar uma nota própria (XML/PDF), auditoria. O botão "Recomeçar demonstração" volta tudo ao início |
-| **3. Ver o Desafio 2 publicado** | nenhum | Vídeo gerado pelo fluxo: [`exemplo_visual_gemini.mp4`](desafio2-tiktok-n8n/assets/exemplo_visual_gemini.mp4); 4 publicações reais no TikTok, com `publish_id` em [Testes realizados](desafio2-tiktok-n8n/README.md#testes-realizados) |
+| **3. Verificar o Desafio 2 pelo GitHub** | nenhum | Vídeo gerado pelo fluxo, capturas do n8n, da aprovação no Telegram e do perfil no TikTok, e as 5 publicações reais com `publish_id`: [Evidências e roteiro de verificação](desafio2-tiktok-n8n/README.md#evidências) |
 | **4. Rodar tudo localmente** | ~15 min (Windows, Python 3.12) | Os dois desafios completos, inclusive o n8n e os dois servidores MCP. Passo a passo abaixo |
 | **5. Demonstração ao vivo** | uma chamada | Post real no TikTok com aprovação pelo Telegram, disparado pelo n8n ou pelo Claude via MCP. Contato: pauloarthur.case@gmail.com |
 
@@ -64,7 +64,7 @@ pip install -r desafio1-agente-nf/requirements.txt -r desafio2-tiktok-n8n/requir
   (todos com o status esperado), o guard-rail da IA e o loop do agente com cliente simulado. Servidor MCP
   testado com cliente MCP real. Painel Streamlit testado headless. Validado com IA real (OpenRouter e,
   como reserva, Gemini) e com e-mail real.
-- **Desafio 2:** executado no n8n 2.41.7 local. **4 posts reais** no TikTok (sandbox, conta de teste privada),
+- **Desafio 2:** executado no n8n 2.41.7 local. **5 posts reais** no TikTok (sandbox, conta de teste privada),
   disparados pelo n8n e pelo servidor MCP e aprovados pelo Telegram, até `PUBLISH_COMPLETE`; o último com
   roteiro escrito pelo Gemini (reserva) e o visual completo (fotos, emojis, legendas palavra a palavra, trilha). OAuth real,
   renovação de token, conta desconectada, recusa da API e falha da IA (fallback) também testados.

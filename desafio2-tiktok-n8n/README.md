@@ -12,10 +12,8 @@ Fluxo low-code no **n8n** que cria e publica sozinho vídeos curtos no TikTok:
 5. publica pela **TikTok Content Posting API** oficial (Direct Post), acompanha o processamento e registra
    tudo num log. Erros caem num workflow de tratamento, com mensagem clara.
 
-**Publicação real validada em 06/10/2026:** 4 vídeos chegaram a `PUBLISH_COMPLETE` na conta de teste do
-sandbox, todos aprovados pelo Telegram. O primeiro foi `v_pub_file~v2-1.7693659920302147605`; o último,
-com roteiro do Gemini e o visual completo, foi `v_pub_file~v2-1.7693674964672235540`. Detalhes em
-[Testes realizados](#testes-realizados).
+**Publicação real validada:** 5 vídeos chegaram a `PUBLISH_COMPLETE` na conta de teste do sandbox
+(06/10 e 08/10/2026), todos aprovados pelo Telegram. Imagens e lista completa em [Evidências](#evidências).
 
 Inspirado no vídeo de referência ("This n8n AI Agent will AUTOMATE your Social Media"). As melhorias estão
 em [Diferenciais](#diferenciais).
@@ -25,6 +23,50 @@ em [Diferenciais](#diferenciais).
 Vídeo publicado pelo fluxo, com roteiro escrito pelo Gemini:
 [`assets/exemplo_visual_gemini.mp4`](assets/exemplo_visual_gemini.mp4) (`publish_id v_pub_file~v2-1.7693674964672235540`).
 A primeira versão, mais simples, está em [`assets/exemplo_golpe_do_boleto.mp4`](assets/exemplo_golpe_do_boleto.mp4).
+
+## Evidências
+
+**1. O fluxo no n8n** (workflow "TikTok · Post automático com IA", 38 nós): gatilhos → cadeia de IA ou banco
+de roteiros → vídeo → aprovação → token → envio ao TikTok → consulta de status → log.
+
+![Workflow principal no n8n](assets/evidencia_fluxo_n8n.png)
+
+**2. A aprovação humana no Telegram:** o bot envia o vídeo pronto, a legenda e o tema, e o fluxo fica pausado
+até alguém tocar em **Publicar** ou **Descartar**.
+
+![Aprovação no Telegram](assets/evidencia_telegram_aprovacao.png)
+
+**3. O resultado no TikTok:** perfil da conta de teste do sandbox com os 5 vídeos publicados pela API, todos
+privados (cadeado), como exige um app ainda não auditado. Os dois da direita são da primeira versão visual
+(degradê); os três da esquerda, do visual atual (foto, emoji, legendas).
+
+![Perfil da conta de teste no TikTok](assets/evidencia_tiktok_perfil.png)
+
+**4. As 5 publicações reais** (registradas no log: [`assets/exemplo_log_publicacoes.csv`](assets/exemplo_log_publicacoes.csv)):
+
+| Data | Tema | Roteiro | `publish_id` |
+|---|---|---|---|
+| 06/10 17:52 | golpe do boleto | banco de roteiros | `v_pub_file~v2-1.7693659920302147605` |
+| 06/10 18:01 | Automação de notas fiscais | banco de roteiros | `v_pub_file~v2-1.7693662703646312454` |
+| 06/10 18:45 | conciliação bancária | banco de roteiros, visual novo | `v_pub_file~v2-1.7693673373330737172` |
+| 06/10 18:49 | Previsão de fluxo de caixa automatizada | IA (`gemini-3.5-flash`) | `v_pub_file~v2-1.7693674964672235540` |
+| 08/10 15:49 | Automação de Contas a Pagar com IA | IA (`gemini-3.5-flash`) | `v_pub_file~v2-1.7694370358614394900` |
+
+### Como verificar pelo GitHub
+
+1. **Visão geral:** [guia completo do Desafio 2 (PDF)](../docs/guia-desafio2-tiktok-n8n.pdf), seções 1 a 3:
+   negócio, jornada do usuário e o que é feito por IA e o que não é.
+2. **Resultado:** o vídeo [`assets/exemplo_visual_gemini.mp4`](assets/exemplo_visual_gemini.mp4) e as
+   evidências acima.
+3. **Fluxo:** [`workflows/01_tiktok_post_automatico.json`](workflows/01_tiktok_post_automatico.json), que pode
+   ser importado em qualquer n8n, e [Arquitetura](#arquitetura).
+4. **Implementação:** [`workflows/src/build.py`](workflows/src/build.py) (gera os workflows),
+   [`media_service/render.py`](media_service/render.py) (monta o vídeo) e
+   [`media_service/server.py`](media_service/server.py) (serviço de mídia e simulador da API do TikTok).
+5. **Configuração da publicação real:** [`docs/setup-tiktok.md`](docs/setup-tiktok.md) (app sandbox, OAuth,
+   conta de teste privada, Telegram).
+6. **Executar:** no [modo simulador](#modo-simulador-sem-nenhuma-conta), sem conta no TikTok; a publicação
+   real pode ser demonstrada ao vivo.
 
 ## Arquitetura
 
