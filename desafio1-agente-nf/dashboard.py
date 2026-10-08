@@ -46,6 +46,11 @@ if DEMO_AUTOMATICA and not config.DB_PATH.exists() and not (config.INBOX_DIR.exi
     gerar_demo()
 
 
+def md(texto) -> str:
+    """Escapa o "$" para o Streamlit não ler "R$ 420 ... R$ 389" como fórmula matemática."""
+    return str(texto).replace("$", r"\$")
+
+
 def carregar() -> pd.DataFrame:
     with store.conexao() as con:
         return pd.DataFrame(store.listar(con))
@@ -89,7 +94,7 @@ with st.sidebar:
         destino = config.INBOX_DIR / enviado.name
         destino.write_bytes(enviado.getvalue())
         r = processar_documento(destino)
-        st.info(f"{ICONE.get(r['status'], '')} {r['status']}: {r['justificativa']}")
+        st.info(f"{ICONE.get(r['status'], '')} {r['status']}: {md(r['justificativa'])}")
 
 df = carregar()
 if df.empty:
@@ -120,12 +125,12 @@ with aba_fila:
         st.success("Nenhuma pendência. 🎉")
     analista = st.text_input("Seu nome (vai para a trilha de auditoria)", value="analista")
     for _, d in fila.iterrows():
-        with st.expander(f"#{d['id']} · {d['arquivo']} · {d['nome_emitente']} · R$ {d['valor_total']:.2f}",
+        with st.expander(f"#{d['id']} · {d['arquivo']} · {d['nome_emitente']} · R\\$ {d['valor_total']:.2f}",
                          expanded=True):
-            st.write(d["justificativa"])
+            st.write(md(d["justificativa"]))
             with store.conexao() as con:
                 for v in store.verificacoes_de(con, int(d["id"])):
-                    st.write(f"{SEV[v['severidade']]} **{v['regra']}**: {v['mensagem']}")
+                    st.write(f"{SEV[v['severidade']]} **{v['regra']}**: {md(v['mensagem'])}")
             obs = st.text_input("Observação", key=f"obs{d['id']}")
             b1, b2 = st.columns(2)
             if b1.button("Aprovar", key=f"ap{d['id']}"):
