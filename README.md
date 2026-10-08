@@ -12,6 +12,34 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 **Ver funcionando:** `.\demo.ps1 -Somente d1` ou `-Somente d2` e siga o
 [roteiro de demonstração](COMO_DEMONSTRAR.md).
 
+## Para o avaliador
+
+| Como avaliar | Esforço | O que dá para ver |
+|---|---|---|
+| **1. Ler os guias completos** | nenhum | Do produto ao código, com o que é feito por IA e o que não é: [guia do Desafio 1 (PDF)](docs/guia-desafio1-agente-contas-a-pagar.pdf) · [guia do Desafio 2 (PDF)](docs/guia-desafio2-tiktok-n8n.pdf) |
+| **2. Usar o Desafio 1 online** | só um navegador | **[Painel do agente de contas a pagar](__URL_STREAMLIT__)**, com IA gratuita: processar os 11 documentos, ver aprovados, revisões e golpes barrados, decidir pendências, enviar uma nota própria (XML/PDF), auditoria. O botão "Recomeçar demonstração" volta tudo ao início |
+| **3. Ver o Desafio 2 publicado** | nenhum | Vídeo gerado pelo fluxo: [`exemplo_visual_gemini.mp4`](desafio2-tiktok-n8n/assets/exemplo_visual_gemini.mp4); 4 publicações reais no TikTok, com `publish_id` em [Testes realizados](desafio2-tiktok-n8n/README.md#testes-realizados) |
+| **4. Rodar tudo localmente** | ~15 min (Windows, Python 3.12) | Os dois desafios completos, inclusive o n8n e os dois servidores MCP. Passo a passo abaixo |
+| **5. Demonstração ao vivo** | uma chamada | Post real no TikTok com aprovação pelo Telegram, disparado pelo n8n ou pelo Claude via MCP. Contato: pauloarthur.case@gmail.com |
+
+### Rodar localmente
+
+```powershell
+git clone <url deste repositório> Case-GoGroup
+cd Case-GoGroup
+pip install -r desafio1-agente-nf/requirements.txt -r desafio2-tiktok-n8n/requirements.txt
+```
+
+- **Desafio 1:** `.\demo.ps1 -Somente d1` abre o painel em <http://localhost:8501>. Sem nenhuma chave, roda
+  no modo offline (regras + leitura de PDF por padrões de texto). Para usar IA, copie
+  `desafio1-agente-nf\.env.example` para `.env` e cole uma chave gratuita do
+  [OpenRouter](https://openrouter.ai/settings/keys) e/ou do [Gemini](https://aistudio.google.com/apikey).
+  Servidor MCP: `claude mcp add contas-a-pagar -- python desafio1-agente-nf/mcp_server.py`.
+- **Desafio 2:** precisa de Node 24 e ffmpeg. Siga o [README do Desafio 2](desafio2-tiktok-n8n/README.md)
+  no **modo simulador**: o fluxo inteiro (roteiro, vídeo, OAuth, envio, status, log, MCP) roda sem conta no
+  TikTok, contra um simulador que segue as regras da API real. Para publicar de verdade, o
+  [setup do TikTok](desafio2-tiktok-n8n/docs/setup-tiktok.md) cria o app sandbox e a conta de teste.
+
 ## O que o case pede → onde está
 
 | Requisito do documento | Entrega |
@@ -55,7 +83,7 @@ Entrega dos dois desafios do Business Case, construída com **Claude Code**.
 
 ```
 Case-GoGroup/
-├── Estágio de RPA.pdf                 # enunciado
+├── docs/                              # guias completos dos dois desafios (PDF)
 ├── desafio1-agente-nf/                # agente de contas a pagar (Python + MCP + Streamlit)
 └── desafio2-tiktok-n8n/               # workflows n8n + serviço de mídia + simulador TikTok
 ```

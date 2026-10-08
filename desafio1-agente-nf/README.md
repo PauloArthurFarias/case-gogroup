@@ -118,6 +118,28 @@ python -m pytest -q                               # testes
 | `boleto_009_fraude_beneficiario.pdf` | Golpe do boleto: nome do fornecedor real, CNPJ de terceiro | REJEITADO |
 | `nfe_010_paletes_vence_em_2_dias.xml` | Correta, vence em 2 dias | APROVADO + PRIORIDADE |
 
+## Painel online (Streamlit Community Cloud)
+
+O painel pode ser publicado de graça, direto do GitHub, para alguém usar só pelo navegador:
+
+1. Em <https://share.streamlit.io>, entre com o GitHub e clique em **Create app** → **Deploy a public app from GitHub**.
+2. Repositório deste projeto, branch `main`, arquivo `desafio1-agente-nf/dashboard.py`. Em **Advanced settings**,
+   escolha Python 3.12.
+3. Em **Secrets**, cole as mesmas variáveis do `.env`, no formato TOML, mais `AP_DEMO_AUTOMATICA`:
+   ```toml
+   AP_DEMO_AUTOMATICA = "1"
+   AP_LLM_PROVEDOR = "openai_compat"
+   AP_LLM_BASE_URL = "https://openrouter.ai/api/v1"
+   AP_LLM_API_KEY = "sk-or-..."
+   AP_LLM_MODELO = "nvidia/nemotron-3-super-120b-a12b:free"
+   AP_LLM_RESERVA_API_KEY = "..."
+   ```
+
+Com `AP_DEMO_AUTOMATICA=1`, o painel gera os 11 documentos fictícios na primeira abertura (o disco do servidor
+é temporário) e mostra o botão **Recomeçar demonstração**. As chaves ficam só nos Secrets do Streamlit: o
+`dashboard.py` as transforma em variáveis de ambiente, como se viessem do `.env`. Sem chaves, o painel online
+roda no modo offline.
+
 ## Integração MCP
 
 O `mcp_server.py` expõe o agente como ferramentas MCP:

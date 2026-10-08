@@ -12,6 +12,7 @@ import base64
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -252,11 +253,16 @@ def provedor():
 
 
 _cadeia_do_processo = None
+_cadeia_criada_em = 0.0
+# Num servidor que fica no ar (painel online), a cadeia é refeita de hora em hora: assim um modelo
+# marcado como esgotado volta a ser tentado depois que a cota renova.
+VALIDADE_CADEIA_S = 3600
 
 
 def provedor_do_processo():
-    """Mesma cadeia durante o processo inteiro, para o disjuntor de cota valer no lote todo."""
-    global _cadeia_do_processo
-    if _cadeia_do_processo is None:
+    """Mesma cadeia durante o lote, para o disjuntor de cota valer no lote todo."""
+    global _cadeia_do_processo, _cadeia_criada_em
+    if _cadeia_do_processo is None or time.monotonic() - _cadeia_criada_em > VALIDADE_CADEIA_S:
         _cadeia_do_processo = provedor()
+        _cadeia_criada_em = time.monotonic()
     return _cadeia_do_processo

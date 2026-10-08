@@ -3,6 +3,7 @@
 Executar: streamlit run dashboard.py
 """
 import json
+import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -12,13 +13,37 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from ap_agent import config, store  # noqa: E402
+# Na nuvem (Streamlit Community Cloud) as chaves vêm dos "Secrets", não de um .env. Elas precisam
+# virar variáveis de ambiente antes de importar a configuração.
+try:
+    for _k, _v in st.secrets.items():
+        if isinstance(_v, (str, int, float)):
+            os.environ.setdefault(_k, str(_v))
+except Exception:  # sem secrets.toml: execução local com .env
+    pass
+
+from ap_agent import cadastros, config, store  # noqa: E402
 from ap_agent.models import Status  # noqa: E402
 from ap_agent.pipeline import arquivos_da_pasta, processar_documento, processar_emails, processar_pasta  # noqa: E402
 
 st.set_page_config(page_title="Agente de Contas a Pagar", page_icon="🧾", layout="wide")
 ICONE = {"APROVADO": "🟢", "REVISAO": "🟡", "REJEITADO": "🔴", "PAGO": "🔵"}
 SEV = {"OK": "✅", "ALERTA": "⚠️", "CRITICO": "⛔"}
+
+
+# Modo demonstração online: AP_DEMO_AUTOMATICA=1 gera os documentos fictícios na primeira abertura
+# (o disco do servidor é temporário) e mostra o botão para recomeçar.
+DEMO_AUTOMATICA = os.getenv("AP_DEMO_AUTOMATICA") == "1"
+
+
+def gerar_demo() -> None:
+    from scripts.gerar_dados_ficticios import main as gerar
+    gerar(limpar=True)
+    cadastros.recarregar()
+
+
+if DEMO_AUTOMATICA and not config.DB_PATH.exists() and not (config.INBOX_DIR.exists() and arquivos_da_pasta()):
+    gerar_demo()
 
 
 def carregar() -> pd.DataFrame:
@@ -55,6 +80,10 @@ with st.sidebar:
     else:
         st.button("Buscar e-mails", disabled=True, width="stretch",
                   help="Configure AP_EMAIL_USUARIO e AP_EMAIL_SENHA no .env")
+    if DEMO_AUTOMATICA and st.button("Recomeçar demonstração", width="stretch",
+                                     help="Apaga a base e recria os 11 documentos fictícios"):
+        gerar_demo()
+        st.rerun()
     enviado = st.file_uploader("Enviar NF-e (XML) / DANFE / boleto (PDF)", type=["xml", "pdf"])
     if enviado and st.button("Processar arquivo enviado", width="stretch"):
         destino = config.INBOX_DIR / enviado.name
@@ -64,8 +93,12 @@ with st.sidebar:
 
 df = carregar()
 if df.empty:
-    st.info("Nenhum documento processado ainda. Gere a demo com `python scripts/gerar_dados_ficticios.py` "
-            "e clique em **Processar novos da inbox**.")
+    if DEMO_AUTOMATICA:
+        st.info("Há 11 documentos fictícios na caixa de entrada. Clique em **Processar novos da inbox**, "
+                "na barra lateral, para o agente decidir cada um (cerca de 1 minuto com IA).")
+    else:
+        st.info("Nenhum documento processado ainda. Gere a demo com `python scripts/gerar_dados_ficticios.py` "
+                "e clique em **Processar novos da inbox**.")
     st.stop()
 
 # ------------------------------------------------------------------ KPIs
