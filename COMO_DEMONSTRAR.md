@@ -109,10 +109,12 @@ Para demonstrar sem conta nenhuma, veja "Modo simulador" no README do Desafio 2.
 | 8 | Repita o passo 2 e toque em **Descartar** | Nada é publicado; o log registra `DESCARTADO` |
 | 9 | Aba **Executions** e workflow **TikTok · Autenticação** | Todas as execuções; login OAuth, callback e renovação automática do token |
 
-**Botões do Telegram no celular:** eles abrem um link do n8n. Por padrão, o link é `localhost` e só funciona
-no próprio computador. Para aprovar pelo celular, abra o túnel
-(`$HOME\tools\cloudflared.exe tunnel --url http://localhost:5678`) e inicie o n8n com
-`$env:N8N_WEBHOOK_URL = "<url do túnel>/"` (detalhes em `docs/setup-tiktok.md`).
+**Botões do Telegram:** eles abrem um link do n8n. A cada início, o `iniciar.ps1` (chamado pelo `demo.ps1`)
+abre um túnel HTTPS novo e usa o endereço dele nesses links, então a aprovação funciona no computador e no
+celular. O endereço aparece em verde na janela do n8n; fechar essa janela fecha o túnel. Se o túnel não abrir
+(sem internet), aparece um aviso e os links passam a ser `localhost`, que funcionam só no computador.
+Mensagens de uma sessão anterior apontam para o túnel antigo: nelas, troque o começo do link por
+`http://localhost:5678`.
 
 **Se algo der errado:** a mensagem de erro do fluxo diz o motivo e o que fazer. Por exemplo, "conta precisa
 ser privada" ou "refaça o login". A tabela completa está em `desafio2-tiktok-n8n/docs/setup-tiktok.md`.

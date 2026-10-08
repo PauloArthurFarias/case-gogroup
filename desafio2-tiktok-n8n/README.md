@@ -216,8 +216,9 @@ Log de exemplo: [`assets/exemplo_log_publicacoes.csv`](assets/exemplo_log_public
   (HTTP 503 em horários de pico). A cadeia de reservas e o banco de roteiros garantem o post.
 - **Fotos:** dependem de chave do Pixabay ou do Pexels (o Pexels suspendeu temporariamente novas chaves em
   10/2026). Sem chave, o fundo é degradê.
-- **Túnel rápido:** a URL muda a cada execução do cloudflared. Só é preciso no login e para aprovar pelo
-  celular; para uso contínuo, um túnel nomeado ou domínio fixo.
+- **Túnel rápido:** a URL muda a cada início. O `iniciar.ps1` abre um túnel novo e o passa aos botões do
+  Telegram automaticamente; só o login (uma vez por ano) precisa da URL recadastrada no app do TikTok. Para
+  uso contínuo, um túnel nomeado com domínio fixo (`.\iniciar.ps1 -WebhookUrl ...`).
 - **Rate limit da API do TikTok:** 6 requisições/min por token. O fluxo faz 1 post por execução.
 - **Vídeos < 64 MB:** upload em 1 chunk (os gerados têm cerca de 1 MB).
 - **Fora do n8n:** tokens e log ficam no serviço local. Em produção, usar n8n Credentials/Data Tables ou

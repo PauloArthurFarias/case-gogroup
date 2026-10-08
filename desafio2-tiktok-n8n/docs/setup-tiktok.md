@@ -43,18 +43,17 @@ Copie o **Client key** (do sandbox começa com `sb`) e o **Client secret** para 
 No Telegram, converse com **@BotFather**, envie `/newbot` e copie o token para `TELEGRAM_BOT_TOKEN` no
 `.env`. Depois mande `/start` para o seu bot: é assim que o script descobre o seu chat.
 
-## 5. Túnel HTTPS, só para o login
-O TikTok exige Redirect URI em HTTPS. Com o n8n rodando:
-
-```powershell
-$HOME\tools\cloudflared.exe tunnel --url http://localhost:5678
-```
-
-Copie a URL `https://....trycloudflare.com` e:
+## 5. Túnel HTTPS (login e botões do Telegram)
+O TikTok exige Redirect URI em HTTPS. O `iniciar.ps1` abre um túnel gratuito da Cloudflare a cada início
+(`tunel.ps1`, que usa `$HOME\tools\cloudflared.exe`) e mostra o endereço em verde na janela do n8n. O mesmo
+endereço vai para os botões do Telegram, que funcionam no computador e no celular. Para o login, copie esse
+endereço e:
 1. cadastre `https://....trycloudflare.com/webhook/tiktok/callback` como Redirect URI no Sandbox (passo 3);
-2. no `.env`, preencha `TIKTOK_REDIRECT_URI` com a mesma URL e `TIKTOK_MODO=real`;
-3. para os botões do Telegram funcionarem no celular, reinicie o n8n com
-   `$env:N8N_WEBHOOK_URL = "https://....trycloudflare.com/"` antes de `.\iniciar.ps1`.
+2. no `.env`, preencha `TIKTOK_REDIRECT_URI` com a mesma URL e `TIKTOK_MODO=real`, e rode `python scripts\configurar.py`.
+
+O endereço muda a cada início. Isso só importa para o login, feito uma vez e válido por 365 dias: os botões do
+Telegram sempre recebem o endereço atual. Opções: `.\iniciar.ps1 -SemTunel` (links só no computador) e
+`.\iniciar.ps1 -WebhookUrl "https://meu-dominio/"` (endereço fixo, se houver).
 
 Depois do login, o túnel só é necessário para a aprovação pelo celular. A publicação é feita do n8n para o
 TikTok, sem túnel. O token de acesso dura 24 h e se renova sozinho pelo refresh token, que vale 365 dias.
@@ -95,7 +94,8 @@ Nenhum segredo é impresso.
 | Erro de `client_key` | Chave de Production no lugar da do Sandbox | Usar as chaves do Sandbox |
 | Conta não pode autorizar o app | Target user ainda não ativo | Aguardar até 1 h após adicionar |
 | "Conta TikTok não conectada" | Tokens ausentes ou revogados | Refazer o login (passo 7.1) |
-| Botões do Telegram abrem `localhost` no celular | n8n sem `N8N_WEBHOOK_URL` público | Reiniciar o n8n com a URL do túnel (passo 5.3) |
+| Botões do Telegram abrem `localhost` no celular | O túnel não abriu (aviso amarelo na janela do n8n) | Conferir a internet e reiniciar com `.\iniciar.ps1` |
+| Botão do Telegram: "site não encontrado" | Mensagem de uma sessão anterior, com o túnel antigo | Trocar o começo do link por `http://localhost:5678` e abrir no computador |
 
 ## Referências
 - Content Posting API (Direct Post): <https://developers.tiktok.com/doc/content-posting-api-reference-direct-post>
